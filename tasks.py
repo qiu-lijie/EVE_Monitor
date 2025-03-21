@@ -8,7 +8,7 @@ import time
 import traceback
 
 from eve_monitor.constants import SETTINGS
-from eve_monitor.contract_sniper import watch_contract
+from eve_monitor.contract_sniper import CONTRACT_SNIPER, watch_contract
 from eve_monitor.market_monitor import MARKET_MONITOR, watch_market
 
 
@@ -50,8 +50,8 @@ while True:
         traceback.print_exc()
 
     try:
-        if FEATURES['contract_sniper']:
-            watch_contract(s)
+        if FEATURES[CONTRACT_SNIPER]:
+            watch_contract(s, file_cache)
     except:
         logging.error('Unexpected error occurred during contract watch:')
         traceback.print_exc()
