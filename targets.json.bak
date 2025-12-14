@@ -2,14 +2,15 @@
     "market_monitor": [
         {
             "type_id": 0,
-            "name": "Display name",
+            "region": 0,    # accepts a specific region to look for the item, or 19000001 for plex region
+            "name": "",
             "threshold": 0
         }
     ],
     "market_salvager": [
         {
             "type_id": 0,
-            "name": "Display name"
+            "name": ""
         }
     ]
 }
