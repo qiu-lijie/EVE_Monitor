@@ -340,6 +340,11 @@
         "known_space": true
     },
     {
+        "name": "Yasna Zakh",
+        "region_id": 10001000,
+        "known_space": true
+    },
+    {
         "name": "A-R00001",
         "region_id": 11000001,
         "known_space": false
@@ -552,6 +557,11 @@
     {
         "name": "VR-05",
         "region_id": 14000005,
+        "known_space": false
+    },
+    {
+        "name": "GPMR-01",
+        "region_id": 19000001,
         "known_space": false
     }
 ]

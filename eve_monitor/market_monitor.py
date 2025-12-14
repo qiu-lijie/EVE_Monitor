@@ -89,11 +89,13 @@ def watch_market(s: requests.Session, cache: {str: [str]} = None):
         type_id = target['type_id']
         name = target['name']
         tres = target['threshold']
+        tar_region_id = target.get('region', None)
         logging.info(f'Looking for {name} below {tres:,} isk')
 
         for region in REGIONS:
             (region_name, region_id, known_space) = operator.itemgetter('name', 'region_id', 'known_space')(region)
-            if not known_space: continue
+            if ((tar_region_id != None and tar_region_id != region_id) 
+                or (tar_region_id == None and not known_space)): continue
 
             orders = get_item_orders_in_region(type_id, region_id, s)
             if not orders: continue
