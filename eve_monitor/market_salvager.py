@@ -4,7 +4,7 @@ import sqlite3
 import logging
 import os
 
-from keys import DB_PATH
+from constants import DB_PATH
 
 logging.basicConfig(format="%(asctime)s %(levelname)s\t%(message)s", level=logging.INFO)
 
