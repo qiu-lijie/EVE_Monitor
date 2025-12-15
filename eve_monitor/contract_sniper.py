@@ -8,7 +8,11 @@ CONTRACT_SNIPER = get_module_name(__name__)
 
 
 local_cache = []
-def watch_contract(s: requests.Session, cache: {str: [str]} = None, fetch_all = False):
+
+
+def watch_contract(
+    s: requests.Session, cache: dict[str, list[str]] = None, fetch_all=False
+):
     """watch for low priced low volume contract"""
     if cache == None:
         order_ids_seen = local_cache
