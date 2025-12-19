@@ -10,12 +10,14 @@ from .utils import get_module_name, send_notification
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.2
 MIN_VALUE_THRESHOLD = 100_000_000
+MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 
 conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
 
 # unlike orders, contracts are immutable upon creation, hence all contract seen can be added
 contract_ids_seen: set[int] = set()
+last_fetched: float = 0
 
 
 def search_contract_in_region(s: requests.Session, region_id: int) -> list[object]:
@@ -127,12 +129,17 @@ def get_character_name(s: requests.Session, character_id: int) -> str:
 
 def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
     """watch for low priced low volume contract"""
-    global contract_ids_seen
+    global contract_ids_seen, last_fetched
     if cache != None and CONTRACT_SNIPER in cache:
         contract_ids_seen = set(cache[CONTRACT_SNIPER])
         cache[CONTRACT_SNIPER] = contract_ids_seen
     elif cache != None:
         cache[CONTRACT_SNIPER] = contract_ids_seen
+
+    if time.time() < last_fetched + MIN_PULL_INTERVAL:
+        logging.info("Last pulled within ESI cache period, no op")
+        return
+    last_fetched = time.time()
 
     for region in REGIONS:
         (region_name, region_id, known_space) = operator.itemgetter(
@@ -141,7 +148,7 @@ def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
         if not known_space:
             continue
 
-        logging.debug(f"Looking for contracts in {region_name}")
+        logging.info(f"Looking for contracts in {region_name}")
         contracts = search_contract_in_region(s, region_id)
         for contract in contracts:
             (contract_id, issuer_id, price, title, volume) = operator.itemgetter(
@@ -152,7 +159,7 @@ def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
             (sold, requested) = get_contract_items(s, contract_id)
             if sold == "":
                 contract_ids_seen.add(contract_id)
-                logging.debug("Ignoring buy only or bpc only contract")
+                logging.debug("Ignoring buy or BPC only contract")
                 continue
 
             sold_price = get_appraisal_value(s, sold)
@@ -175,7 +182,7 @@ def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
             ):
                 issuer = get_character_name(s, issuer_id)
                 msg = (
-                    f"The following contract by {issuer} is under valued, consider buying it"
+                    f"The following contract by {issuer} is under valued, consider buying it\n"
                     + base_msg
                 )
                 logging.info(msg)
