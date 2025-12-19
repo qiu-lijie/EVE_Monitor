@@ -26,7 +26,7 @@ def send_notification(s: requests.Session, msg: str):
             if sys.platform.startswith("win"):
                 notification.notify(
                     title=TITLE,
-                    message=msg,
+                    message=msg[:256],
                     app_name=TITLE,
                 )
             # TODO add mac support
@@ -46,6 +46,7 @@ def send_notification(s: requests.Session, msg: str):
                 "title": TITLE,
                 "message": msg,
                 "priority": 0,
+                "sound": "eve_chime",
             }
             r = s.post(PUSHOVER_URL, data=data)
             if r.status_code != 200:

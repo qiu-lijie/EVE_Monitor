@@ -7,4 +7,6 @@
         "market_monitor": false,
         "contract_sniper": false
     }
+    "APPRAISAL_URL": "https://janice.e-351.com/api/rest/v2/appraisal",
+    "APPRAISAL_API_KEY": "<appraisal api key>"
 }
