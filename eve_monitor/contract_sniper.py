@@ -46,6 +46,12 @@ def get_contract_items(s: requests.Session, contract_id: int) -> tuple[str, str]
         )
         return ("", "")
 
+    if len(res.content) == 0:
+        logging.warning(
+            f"Returned 200 status code with empty content for contract {contract_id}"
+        )
+        return ("", "")
+
     items = res.json()
     sold = ""
     requested = ""
