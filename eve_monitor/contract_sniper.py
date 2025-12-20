@@ -30,13 +30,33 @@ def search_contract_in_region(s: requests.Session, region_id: int) -> list[objec
         )
         return []
 
-    res = res.json()
-    return [
-        contract
-        for contract in res
-        if contract["type"] == "item_exchange"
-        and contract["contract_id"] not in contract_ids_seen
-    ]
+    curr_page = 1
+    curr_content = res.json()
+    while res.status_code == 200:
+        prev_content = curr_content
+        curr_content = res.json()
+        curr_page += 1
+        logging.debug(f"Advancing to next page {curr_page}")
+        res = s.get(
+            ESI_URL + f"/contracts/public/{region_id}", params={"page": curr_page}
+        )
+
+    if curr_page == 2:
+        content = curr_content
+    else:
+        content = prev_content + curr_content
+
+    contracts = []
+    for contract in content:
+        contract_id = contract["contract_id"]
+        if contract["type"] != "item_exchange":
+            logging.debug(f"Ignoring non item exchange contract {contract_id}")
+            continue
+        if contract_id in contract_ids_seen:
+            logging.debug(f"Ignoring previously seen contract {contract_id}")
+            continue
+        contracts.append(contract)
+    return contracts
 
 
 def get_contract_items(s: requests.Session, contract_id: int) -> tuple[str, str]:

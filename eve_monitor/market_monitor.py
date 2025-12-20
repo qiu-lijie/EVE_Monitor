@@ -50,6 +50,8 @@ def get_item_orders_in_region(item, region, s=None, order_type="sell"):
         order_type (str): one of buy, sell, all; default to sell
     Returns:
         Returns list of order found, None otherwise
+    Note, no pagination as the assumption is there will be less then 1000 orders for any given type
+        as ESI page size seems to be 1000. Only really matter for PLEX
     """
     if s == None:
         s = requests.Session()
@@ -60,6 +62,11 @@ def get_item_orders_in_region(item, region, s=None, order_type="sell"):
     )
     if r.status_code == 200:
         res = r.json()
+
+    if len(res) >= 1000:
+        logging.warning(
+            f"fetching for type {item} in region {region} returns more than 1000 orders"
+        )
     return res
 
 
