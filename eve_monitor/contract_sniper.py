@@ -8,7 +8,7 @@ from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, DB_PATH, REGIO
 from .utils import get_module_name, send_notification
 
 CONTRACT_SNIPER = get_module_name(__name__)
-ARBITRAGE_THRESHOLD = 0.2
+ARBITRAGE_THRESHOLD = 0.5
 MIN_VALUE_THRESHOLD = 100_000_000
 MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 
@@ -109,10 +109,7 @@ def get_appraisal_value(s: requests.Session, items: str, buy: bool = False) -> f
     return (
         res["effectivePrices"]["totalSellPrice"]
         if buy
-        else max(
-            res["effectivePrices"]["totalSellPrice"],
-            res["effectivePrices"]["totalBuyPrice"],
-        )
+        else res["effectivePrices"]["totalBuyPrice"]
     )
 
 
@@ -148,7 +145,7 @@ def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
         if not known_space:
             continue
 
-        logging.info(f"Looking for contracts in {region_name}")
+        logging.info(f"Looking for contracts in {region_id} {region_name}")
         contracts = search_contract_in_region(s, region_id)
         for contract in contracts:
             (contract_id, issuer_id, price, title, volume) = operator.itemgetter(
@@ -189,5 +186,4 @@ def watch_contract(s: requests.Session, cache: dict[str, list[str]] = None):
                 send_notification(s, msg)
 
             contract_ids_seen.add(contract_id)
-            time.sleep(1)
     return
