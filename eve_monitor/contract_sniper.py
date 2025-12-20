@@ -129,12 +129,11 @@ class ContractSniper(Core):
             return ""
         return res.json()["name"]
 
-    def watch_contract(self, cache: dict[str, list[str]] = None):
+    def watch_contract(self, cache: dict[str, list[int]] = None):
         """watch for low priced low volume contract"""
         if cache != None and CONTRACT_SNIPER in cache:
             self.contract_ids_seen = set(cache[CONTRACT_SNIPER])
-            cache[CONTRACT_SNIPER] = self.contract_ids_seen
-        elif cache != None:
+        if cache != None:
             cache[CONTRACT_SNIPER] = self.contract_ids_seen
 
         if time.time() < self.last_fetched + MIN_PULL_INTERVAL:

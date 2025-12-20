@@ -1,15 +1,14 @@
 import json
 import logging
 import os
-import requests
 import signal
 import sys
 import time
 import traceback
 
 from eve_monitor.constants import SETTINGS
-from eve_monitor.contract_sniper import CONTRACT_SNIPER, watch_contract
-from eve_monitor.market_monitor import MARKET_MONITOR, watch_market
+from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
+from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
 logging.basicConfig(format="%(asctime)s %(levelname)s\t%(message)s", level=logging.INFO)
 logging.getLogger("urllib3").setLevel(logging.INFO)
@@ -45,24 +44,25 @@ def handle_interrupt(_, __):
 signal.signal(signal.SIGINT, handle_interrupt)
 
 
-s = requests.Session()
 FEATURES = SETTINGS["features_enabled"]
 poll_rate = SETTINGS["poll_rate_in_min"]
+
+market_monitor = MarketMonitor()
+contract_sniper = ContractSniper()
 while True:
     try:
         if FEATURES[MARKET_MONITOR]:
-            watch_market(s, file_cache)
+            market_monitor.watch_market(file_cache)
     except:
         logging.error("Unexpected error occurred during market watch:")
         traceback.print_exc()
 
     try:
         if FEATURES[CONTRACT_SNIPER]:
-            watch_contract(s, file_cache)
+            contract_sniper.watch_contract(file_cache)
     except:
         logging.error("Unexpected error occurred during contract watch:")
         traceback.print_exc()
-        input("Press any keys to continue")
 
     logging.info("----sleep----")
     time.sleep(poll_rate * 60)

@@ -1,134 +1,126 @@
 import json
-import logging
 import operator
 import requests
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
-from .utils import get_module_name, send_notification
+from .utils import Core, get_module_name
 
 MARKET_MONITOR = get_module_name(__name__)
 
 
-def get_region_info(s=None):
-    """
-    Get the region info, save to regions.json
-    Args:
-        s (requests.Session object): Session to use, will create one if none provided
-    Returns:
-        Returns True when successfully made all requests
-    """
-    if s == None:
-        s = requests.Session()
-    r = s.get(ESI_URL + "/universe/regions/")
-    if r.status_code != 200:
-        return False
+class MarketMonitor(Core):
+    def __init__(self, s: requests.Session = None):
+        # only stores order_ids that has been sent to client
+        self.order_ids_seen = set()
+        return super().__init__(MARKET_MONITOR, s)
 
-    res = []
-    for rid in r.json():
-        r = s.get(ESI_URL + f"/universe/regions/{rid}/")
-        if r.status_code == 200:
-            r = r.json()
-            res.append(
+    def get_region_info(self):
+        """
+        Get the region info, save to regions.json
+        Returns True when successfully made all requests
+        """
+        res = self.get(ESI_URL + "/universe/regions/", 200)
+        if res.status_code != 200:
+            return False
+
+        regions = []
+        for region_id in res.json():
+            res = self.get(ESI_URL + f"/universe/regions/{region_id}/", 200)
+            if res.status_code != 200:
+                continue
+            res = res.json()
+            regions.append(
                 {
-                    "name": r["name"],
-                    "region_id": r["region_id"],
-                    "known_space": True if r.get("description") else False,
+                    "name": res["name"],
+                    "region_id": res["region_id"],
+                    "known_space": True if res.get("description") else False,
                 }
             )
 
-    json.dump(res, open(REGIONS_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
-    return True
-
-
-def get_item_orders_in_region(item, region, s=None, order_type="sell"):
-    """
-    Get the given item orders in given region
-    Args:
-        item (int): item type_id
-        region (int): region_id
-        s (requests.Session object): Session to use, will create one if none provided
-        order_type (str): one of buy, sell, all; default to sell
-    Returns:
-        Returns list of order found, None otherwise
-    Note, no pagination as the assumption is there will be less then 1000 orders for any given type
-        as ESI page size seems to be 1000. Only really matter for PLEX
-    """
-    if s == None:
-        s = requests.Session()
-    res = None
-    r = s.get(
-        ESI_URL + f"/markets/{region}/orders/",
-        params={"type_id": item, "order_type": order_type},
-    )
-    if r.status_code == 200:
-        res = r.json()
-
-    if len(res) >= 1000:
-        logging.warning(
-            f"fetching for type {item} in region {region} returns more than 1000 orders"
+        json.dump(
+            regions, open(REGIONS_JSON, "w+", encoding="utf-8", newline="\n"), indent=4
         )
-    return res
+        return True
 
+    def get_item_orders_in_region(
+        self, type_id: int, region_id: int, order_type: str = "sell"
+    ):
+        """
+        Get the given item orders in given region
+        Args:
+            order_type (str): one of "buy", "sell", "all"; default to sell
+        Returns:
+            Returns list of order found, [] otherwise
+        Note, no pagination as the assumption is there will be less then 1000 orders for any given type
+            as ESI page size seems to be 1000. Only really matter for PLEX
+        """
+        res = self.get(
+            ESI_URL + f"/markets/{region_id}/orders/",
+            200,
+            params={"type_id": type_id, "order_type": order_type},
+        )
+        if res.status_code != 200:
+            return []
 
-def get_system_name(system, s=None):
-    """Returns the system name of given system id, None otherwise"""
-    if s == None:
-        s = requests.Session()
-    res = None
-    r = s.get(ESI_URL + f"/universe/systems/{system}/")
-    if r.status_code == 200:
-        res = r.json().get("name")
-    return res
+        res = res.json()
+        if len(res) >= 1000:
+            self.log.warning(
+                f"fetching for type {type_id} in region {region_id} returns more than 1000 orders"
+            )
+        return res
 
+    def get_system_name(self, system_id: int):
+        """Returns the system name of given system id, "" otherwise"""
+        res = self.get(ESI_URL + f"/universe/systems/{system_id}/", 200)
+        if res.status_code != 200:
+            return ""
+        return res.json()["name"]
 
-local_cache = []
+    def watch_market(self, cache: dict[str, list[int]] = None):
+        """watch market orders for items in TARGETS.market_monitor"""
+        if cache != None and MARKET_MONITOR in cache:
+            self.order_ids_seen = set(cache[MARKET_MONITOR])
+        if cache != None:
+            cache[MARKET_MONITOR] = self.order_ids_seen
 
+        # load each time to enable hot reload
+        targets = json.load(open(TARGETS_JSON))[MARKET_MONITOR]
+        for target in targets:
+            orders_seen = 0
+            tar_region_id = target.get("region", None)
+            (type_id, name, threshold) = operator.itemgetter(
+                "type_id", "name", "threshold"
+            )(target)
+            self.log.info(f"Looking for {name} below {threshold:,} isk")
 
-def watch_market(s: requests.Session, cache: dict[str, list[str]] = None):
-    """watch market orders for items in TARGETS.market_monitor"""
-    if cache == None:
-        order_ids_seen = local_cache
-    elif MARKET_MONITOR in cache:
-        order_ids_seen = cache[MARKET_MONITOR]
-    else:
-        cache[MARKET_MONITOR] = local_cache
-        order_ids_seen = local_cache
-    # load each time to enable hot reload
-    targets = json.load(open(TARGETS_JSON))[MARKET_MONITOR]
+            for region in REGIONS:
+                (region_name, region_id, known_space) = operator.itemgetter(
+                    "name", "region_id", "known_space"
+                )(region)
+                if (tar_region_id != None and tar_region_id != region_id) or (
+                    tar_region_id == None and not known_space
+                ):
+                    continue
 
-    for target in targets:
-        orders_seen = 0
-        res = []
-        type_id = target["type_id"]
-        name = target["name"]
-        tres = target["threshold"]
-        tar_region_id = target.get("region", None)
-        logging.info(f"Looking for {name} below {tres:,} isk")
+                orders = self.get_item_orders_in_region(type_id, region_id)
+                orders_seen += len(orders)
+                for order in orders:
+                    (order_id, price, system_id, volume_remain, volume_total) = (
+                        operator.itemgetter(
+                            "order_id",
+                            "price",
+                            "system_id",
+                            "volume_remain",
+                            "volume_total",
+                        )(order)
+                    )
+                    if price <= threshold and order_id not in self.order_ids_seen:
+                        system = self.get_system_name(system_id)
+                        msg = f"{name} selling for {price:,.0f} isk in {system}, {region_name}, {volume_remain}/{volume_total}"
+                        self.log.info(msg)
+                        self.send_notification(msg)
+                        self.order_ids_seen.append(order_id)
 
-        for region in REGIONS:
-            (region_name, region_id, known_space) = operator.itemgetter(
-                "name", "region_id", "known_space"
-            )(region)
-            if (tar_region_id != None and tar_region_id != region_id) or (
-                tar_region_id == None and not known_space
-            ):
-                continue
-
-            orders = get_item_orders_in_region(type_id, region_id, s)
-            if not orders:
-                continue
-            orders_seen += len(orders)
-            for o in orders:
-                if o["price"] <= tres and o["order_id"] not in order_ids_seen:
-                    order_ids_seen.append(o["order_id"])
-                    system = get_system_name(o["system_id"], s)
-                    out = f"{name} selling for {o['price']:,.0f} isk in {system}, {region_name}, {o['volume_remain']}/{o['volume_total']}"
-                    logging.info(out)
-                    res.append(out)
-
-        if orders_seen == 0:
-            logging.warning(f"Done looking for {name}, no order found")
-
-        for msg in res:
-            send_notification(s, msg)
-    return
+            if orders_seen == 0:
+                self.log.warning(f"Done looking for {name}, no order found")
+        return
