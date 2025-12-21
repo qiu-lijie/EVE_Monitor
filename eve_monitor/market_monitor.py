@@ -119,7 +119,7 @@ class MarketMonitor(Core):
                         msg = f"{name} selling for {price:,.0f} isk in {system}, {region_name}, {volume_remain}/{volume_total}"
                         self.log.info(msg)
                         self.send_notification(msg)
-                        self.order_ids_seen.append(order_id)
+                        self.order_ids_seen.add(order_id)
 
             if orders_seen == 0:
                 self.log.warning(f"Done looking for {name}, no order found")
