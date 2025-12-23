@@ -3,15 +3,28 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
-import traceback
 
 from eve_monitor.constants import SETTINGS
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
-logging.basicConfig(format="%(asctime)s %(levelname)s\t%(message)s", level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s %(name)s %(levelname)s\t%(message)s", level=logging.INFO
+)
 logging.getLogger("urllib3").setLevel(logging.INFO)
+
+FEATURES = SETTINGS["features_enabled"]
+POLL_RATE = SETTINGS["poll_rate_in_min"]
+CACHE_JSON = "cache.json"
+if not os.path.exists(CACHE_JSON):
+    json.dump({}, open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
+
+file_cache = json.load(open(CACHE_JSON, "r", encoding="utf-8"))
+event = threading.Event()
+features = []
+threads = []
 
 
 def dump_cache(cache: dict[str, list[str]]):
@@ -28,14 +41,11 @@ def dump_cache(cache: dict[str, list[str]]):
     return
 
 
-CACHE_JSON = "cache.json"
-if not os.path.exists(CACHE_JSON):
-    json.dump({}, open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
-file_cache = json.load(open(CACHE_JSON, "r", encoding="utf-8"))
-
-
 def handle_interrupt(_, __):
     """dump file cache then exist when interrupt"""
+    event.set()
+    for thread in threads:
+        thread.join()
     dump_cache(file_cache)
     sys.exit(0)
     return
@@ -43,26 +53,17 @@ def handle_interrupt(_, __):
 
 signal.signal(signal.SIGINT, handle_interrupt)
 
+if FEATURES[MARKET_MONITOR]:
+    features.append(MarketMonitor(threaded=event))
+if FEATURES[CONTRACT_SNIPER]:
+    features.append(ContractSniper(threaded=event))
 
-FEATURES = SETTINGS["features_enabled"]
-poll_rate = SETTINGS["poll_rate_in_min"]
+for feature in features:
+    t = threading.Thread(target=feature.run, args=(POLL_RATE, file_cache))
+    t.start()
+    threads.append(t)
 
-market_monitor = MarketMonitor()
-contract_sniper = ContractSniper()
+if features == []:
+    logging.error("Improperly configured, enable some features in settings")
 while True:
-    try:
-        if FEATURES[MARKET_MONITOR]:
-            market_monitor.watch_market(file_cache)
-    except:
-        logging.error("Unexpected error occurred during market watch:")
-        traceback.print_exc()
-
-    try:
-        if FEATURES[CONTRACT_SNIPER]:
-            contract_sniper.watch_contract(file_cache)
-    except:
-        logging.error("Unexpected error occurred during contract watch:")
-        traceback.print_exc()
-
-    logging.info("----sleep----")
-    time.sleep(poll_rate * 60)
+    time.sleep(5)

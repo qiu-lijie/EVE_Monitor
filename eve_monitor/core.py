@@ -1,8 +1,9 @@
+import abc
 import logging
 import requests
 import sqlite3
 import sys
-from operator import itemgetter
+import threading
 from plyer import notification
 
 from .constants import (
@@ -21,11 +22,37 @@ def get_module_name(name: str) -> str:
     return name[name.rfind(".") + 1 :]
 
 
-class Core:
-    def __init__(self, log_name: str, s: requests.Session = None):
-        self.s = s if s else requests.Session()
-        self.cur = sqlite3.connect(DB_PATH).cursor()
+class Core(abc.ABC):
+    def __init__(
+        self,
+        log_name: str,
+        session: requests.Session = None,
+        threaded: threading.Event = False,
+    ):
+        self.s = session if session else requests.Session()
+        self.threaded = threaded
+        if not threaded:
+            self.cur = sqlite3.connect(DB_PATH).cursor()
         self.log = logging.getLogger(log_name)
+        return
+
+    @abc.abstractmethod
+    def main(self, cache):
+        """used by self.run in it's main loop"""
+        return
+
+    def run(self, poll_rate: int, cache: dict = None):
+        # creates the cursor as SQLite objects created in a thread can only be used in that same thread
+        self.cur = sqlite3.connect(DB_PATH).cursor()
+        try:
+            while True:
+                self.main(cache)
+                self.log.info("sleeping")
+                if self.threaded.wait(poll_rate * 60):
+                    self.log.info("Interrupt received, exiting")
+                    break
+        except:
+            self.log.exception("Unexpected error occurred")
         return
 
     def send_notification(self, msg: str):
@@ -66,7 +93,7 @@ class Core:
     def get(
         self,
         url: str,
-        excepted_status_codes: int | tuple[int],
+        excepted_status_codes: int | tuple[int] = (200,),
         *args,
         **kwargs,
     ) -> requests.Response:
@@ -83,7 +110,7 @@ class Core:
     def post(
         self,
         url: str,
-        excepted_status_codes: int | tuple[int],
+        excepted_status_codes: int | tuple[int] = (200,),
         *args,
         **kwargs,
     ) -> requests.Response:
@@ -97,22 +124,24 @@ class Core:
             )
         return res
 
-    def get_station_info(self, station_id: int) -> tuple[str, int]:
-        """returns a tuple of (station_name, system_id), use ESI as we can be dealing with citadels"""
-        res = self.get(ESI_URL=f"/universe/stations/{station_id}")
-        if res.status_code != 200:
-            return ("", 0)
-        (station_name, system_id) = itemgetter("name", "system_id")(res.json())
-        return (station_name, system_id)
+    def get_station_info(self, station_id: int) -> tuple[str, int, float]:
+        """returns a tuple of (station_name, system_id, security)"""
+        self.cur.execute(
+            """select stationName, solarSystemID, security from staStations where stationID = ?""",
+            (station_id,),
+        )
+        res = self.cur.fetchone()
+        if res == None:
+            return ("player citadel", 0)
+        return res
 
     def get_system_info(self, system_id: int) -> tuple[str, float]:
         """returns a tuple of (system_name, security)"""
         self.cur.execute(
             """select solarSystemName, security from mapSolarSystems where solarSystemID = ?""",
-            system_id,
+            (system_id,),
         )
         res = self.cur.fetchone()
         if res == None:
-            self.log.warning(f"{system_id} not found in mapSolarSystems")
-            return ("", 0)
-        return (res[0], res[1])
+            return ("unknown system", 0.0)
+        return res

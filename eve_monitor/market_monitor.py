@@ -1,5 +1,4 @@
 import json
-import requests
 from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
@@ -9,10 +8,10 @@ MARKET_MONITOR = get_module_name(__name__)
 
 
 class MarketMonitor(Core):
-    def __init__(self, s: requests.Session = None):
+    def __init__(self, *args, **kwargs):
         # only stores order_ids that has been sent to client
         self.order_ids_seen = set()
-        return super().__init__(MARKET_MONITOR, s)
+        return super().__init__(MARKET_MONITOR, *args, **kwargs)
 
     def get_region_info(self):
         """
@@ -81,13 +80,13 @@ class MarketMonitor(Core):
         for target in targets:
             orders_seen = 0
             tar_region_id = target.get("region", None)
-            (type_id, name, threshold) = itemgetter("type_id", "name", "threshold")(
+            type_id, name, threshold = itemgetter("type_id", "name", "threshold")(
                 target
             )
             self.log.info(f"Looking for {name} below {threshold:,} isk")
 
             for region in REGIONS:
-                (region_name, region_id, known_space) = itemgetter(
+                region_name, region_id, known_space = itemgetter(
                     "name", "region_id", "known_space"
                 )(region)
                 if (tar_region_id != None and tar_region_id != region_id) or (
@@ -98,7 +97,7 @@ class MarketMonitor(Core):
                 orders = self.get_item_orders_in_region(type_id, region_id)
                 orders_seen += len(orders)
                 for order in orders:
-                    (order_id, price, system_id, volume_remain, volume_total) = (
+                    order_id, price, system_id, volume_remain, volume_total = (
                         itemgetter(
                             "order_id",
                             "price",
@@ -117,3 +116,5 @@ class MarketMonitor(Core):
             if orders_seen == 0:
                 self.log.warning(f"Done looking for {name}, no order found")
         return
+
+    main = watch_market

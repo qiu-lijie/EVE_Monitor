@@ -1,4 +1,3 @@
-import requests
 import time
 from operator import itemgetter
 
@@ -12,11 +11,11 @@ MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 
 
 class ContractSniper(Core):
-    def __init__(self, s: requests.Session = None):
+    def __init__(self, *args, **kwargs):
         # unlike orders, contracts are immutable upon creation, hence all contract seen can be added
         self.contract_ids_seen: set[int] = set()
         self.last_fetched: float = 0
-        return super().__init__(CONTRACT_SNIPER, s)
+        return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
     def search_contract_in_region(self, region_id: int) -> list[dict]:
         """returns all unseen item exchange contracts in a region"""
@@ -70,7 +69,7 @@ class ContractSniper(Core):
             if item.get("is_blueprint_copy", False):
                 continue
 
-            (is_included, quantity, type_id) = itemgetter(
+            is_included, quantity, type_id = itemgetter(
                 "is_included", "quantity", "type_id"
             )(item)
             self.cur.execute(
@@ -138,7 +137,7 @@ class ContractSniper(Core):
         self.last_fetched = time.time()
 
         for region in REGIONS:
-            (region_name, region_id, known_space) = itemgetter(
+            region_name, region_id, known_space = itemgetter(
                 "name", "region_id", "known_space"
             )(region)
             if not known_space:
@@ -147,7 +146,7 @@ class ContractSniper(Core):
             self.log.info(f"Looking for contracts in {region_id} {region_name}")
             contracts = self.search_contract_in_region(region_id)
             for contract in contracts:
-                (contract_id, issuer_id, price, title, volume, station_id) = itemgetter(
+                contract_id, issuer_id, price, title, volume, station_id = itemgetter(
                     "contract_id",
                     "issuer_id",
                     "price",
@@ -157,7 +156,7 @@ class ContractSniper(Core):
                 )(contract)
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
-                (sold, requested) = self.get_contract_items(contract_id)
+                sold, requested = self.get_contract_items(contract_id)
                 if sold == "":
                     self.contract_ids_seen.add(contract_id)
                     self.log.debug("Ignoring buy or BPC only contract")
@@ -166,8 +165,8 @@ class ContractSniper(Core):
                 sold_price = self.get_appraisal_value(sold)
                 requested_price = self.get_appraisal_value(requested, True)
                 value = sold_price - requested_price
-                (station_name, system_id) = self.get_station_info(station_id)
-                (system_name, security) = self.get_system_info(system_id)
+                station_name, system_id, *_ = self.get_station_info(station_id)
+                system_name, security = self.get_system_info(system_id)
                 base_msg = (
                     (f'Contract "{title}"' if title else "Item exchange contract")
                     + f" priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
@@ -195,3 +194,5 @@ class ContractSniper(Core):
 
                 self.contract_ids_seen.add(contract_id)
         return
+
+    main = watch_contract
