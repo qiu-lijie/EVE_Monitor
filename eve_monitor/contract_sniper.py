@@ -1,7 +1,6 @@
-import operator
 import requests
-import sqlite3
 import time
+from operator import itemgetter
 
 from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, DB_PATH, REGIONS
 from .utils import Core, get_module_name
@@ -14,8 +13,6 @@ MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 
 class ContractSniper(Core):
     def __init__(self, s: requests.Session = None):
-        conn = sqlite3.connect(DB_PATH)
-        self.cur = conn.cursor()
         # unlike orders, contracts are immutable upon creation, hence all contract seen can be added
         self.contract_ids_seen: set[int] = set()
         self.last_fetched: float = 0
@@ -73,7 +70,7 @@ class ContractSniper(Core):
             if item.get("is_blueprint_copy", False):
                 continue
 
-            (is_included, quantity, type_id) = operator.itemgetter(
+            (is_included, quantity, type_id) = itemgetter(
                 "is_included", "quantity", "type_id"
             )(item)
             self.cur.execute(
@@ -141,7 +138,7 @@ class ContractSniper(Core):
         self.last_fetched = time.time()
 
         for region in REGIONS:
-            (region_name, region_id, known_space) = operator.itemgetter(
+            (region_name, region_id, known_space) = itemgetter(
                 "name", "region_id", "known_space"
             )(region)
             if not known_space:
@@ -150,8 +147,13 @@ class ContractSniper(Core):
             self.log.info(f"Looking for contracts in {region_id} {region_name}")
             contracts = self.search_contract_in_region(region_id)
             for contract in contracts:
-                (contract_id, issuer_id, price, title, volume) = operator.itemgetter(
-                    "contract_id", "issuer_id", "price", "title", "volume"
+                (contract_id, issuer_id, price, title, volume, station_id) = itemgetter(
+                    "contract_id",
+                    "issuer_id",
+                    "price",
+                    "title",
+                    "volume",
+                    "start_location_id",
                 )(contract)
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
@@ -164,9 +166,12 @@ class ContractSniper(Core):
                 sold_price = self.get_appraisal_value(sold)
                 requested_price = self.get_appraisal_value(requested, True)
                 value = sold_price - requested_price
+                (station_name, system_id) = self.get_station_info(station_id)
+                (system_name, security) = self.get_system_info(system_id)
                 base_msg = (
                     (f'Contract "{title}"' if title else "Item exchange contract")
                     + f" priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
+                    + f"\n\tlocated in {station_name}, {system_name} (sec {security:.2}), {region_name}"
                     + f"\n\tselling {sold_price:,} isk\n{sold}"
                     + (
                         f"\n\trequesting {requested_price:,} isk\n{requested}"

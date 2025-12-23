@@ -1,6 +1,6 @@
 import json
-import operator
 import requests
+from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
 from .utils import Core, get_module_name
@@ -69,13 +69,6 @@ class MarketMonitor(Core):
             )
         return res
 
-    def get_system_name(self, system_id: int):
-        """Returns the system name of given system id, "" otherwise"""
-        res = self.get(ESI_URL + f"/universe/systems/{system_id}/", 200)
-        if res.status_code != 200:
-            return ""
-        return res.json()["name"]
-
     def watch_market(self, cache: dict[str, list[int]] = None):
         """watch market orders for items in TARGETS.market_monitor"""
         if cache != None and MARKET_MONITOR in cache:
@@ -88,13 +81,13 @@ class MarketMonitor(Core):
         for target in targets:
             orders_seen = 0
             tar_region_id = target.get("region", None)
-            (type_id, name, threshold) = operator.itemgetter(
-                "type_id", "name", "threshold"
-            )(target)
+            (type_id, name, threshold) = itemgetter("type_id", "name", "threshold")(
+                target
+            )
             self.log.info(f"Looking for {name} below {threshold:,} isk")
 
             for region in REGIONS:
-                (region_name, region_id, known_space) = operator.itemgetter(
+                (region_name, region_id, known_space) = itemgetter(
                     "name", "region_id", "known_space"
                 )(region)
                 if (tar_region_id != None and tar_region_id != region_id) or (
@@ -106,7 +99,7 @@ class MarketMonitor(Core):
                 orders_seen += len(orders)
                 for order in orders:
                     (order_id, price, system_id, volume_remain, volume_total) = (
-                        operator.itemgetter(
+                        itemgetter(
                             "order_id",
                             "price",
                             "system_id",
@@ -115,7 +108,7 @@ class MarketMonitor(Core):
                         )(order)
                     )
                     if price <= threshold and order_id not in self.order_ids_seen:
-                        system = self.get_system_name(system_id)
+                        system = self.get_system_info(system_id)[0]
                         msg = f"{name} selling for {price:,.0f} isk in {system}, {region_name}, {volume_remain}/{volume_total}"
                         self.log.info(msg)
                         self.send_notification(msg)
