@@ -13,7 +13,7 @@ MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 class ContractSniper(Core):
     def __init__(self, *args, **kwargs):
         # unlike orders, contracts are immutable upon creation, hence all contract seen can be added
-        self.contract_ids_seen: set[int] = set()
+        self.contract_ids_seen = set()
         self.last_fetched: float = 0
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
@@ -169,7 +169,7 @@ class ContractSniper(Core):
                 system_name, security = self.get_system_info(system_id)
                 base_msg = (
                     (f'Contract "{title}"' if title else "Item exchange contract")
-                    + f" priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
+                    + f" ({contract_id}) priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
                     + f"\n\tlocated in {station_name}, {system_name} (sec {security:.2}), {region_name}"
                     + f"\n\tselling {sold_price:,} isk\n{sold}"
                     + (

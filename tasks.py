@@ -11,7 +11,7 @@ from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
 logging.basicConfig(
-    format="%(asctime)s %(name)s %(levelname)s\t%(message)s", level=logging.INFO
+    format="%(asctime)s %(name)15s %(levelname)s\t%(message)s", level=logging.INFO
 )
 logging.getLogger("urllib3").setLevel(logging.INFO)
 
@@ -66,4 +66,4 @@ for feature in features:
 if features == []:
     logging.error("Improperly configured, enable some features in settings")
 while True:
-    time.sleep(5)
+    time.sleep(1000)
