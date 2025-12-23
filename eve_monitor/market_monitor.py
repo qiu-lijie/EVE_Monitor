@@ -3,7 +3,7 @@ import requests
 from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
-from .utils import Core, get_module_name
+from .core import Core, get_module_name
 
 MARKET_MONITOR = get_module_name(__name__)
 

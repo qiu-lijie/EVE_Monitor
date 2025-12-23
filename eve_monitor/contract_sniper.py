@@ -3,7 +3,7 @@ import time
 from operator import itemgetter
 
 from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, DB_PATH, REGIONS
-from .utils import Core, get_module_name
+from .core import Core, get_module_name
 
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5

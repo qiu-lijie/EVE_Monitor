@@ -13,7 +13,6 @@ from .constants import (
     USER_KEY,
     DESKTOP_NOTIFICATION,
     PUSHOVER_NOTIFICATION,
-    ESI_URL,
 )
 
 
