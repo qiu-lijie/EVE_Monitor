@@ -29,9 +29,9 @@ class BaseCache(abc.ABC):
         return
 
     @abc.abstractmethod
-    def to_json_serializable(self) -> str:
+    def to_json_serializable(self) -> object:
         """return a json serializable representation of the cache"""
-        return ""
+        return object()
 
 
 class Core(abc.ABC):

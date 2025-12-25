@@ -1,19 +1,60 @@
 import time
 from operator import itemgetter
 
-from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, DB_PATH, REGIONS
-from .core import Core, get_module_name
+from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, REGIONS
+from .core import BaseCache, Core, get_module_name
 
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
 MIN_VALUE_THRESHOLD = 100_000_000
 MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
+LAST_CONTRACTS_TO_CACHE = 3000  # 1000 per page, last 3 pages
+
+
+class ContractCache(BaseCache):
+    def __init__(self, cache: dict = None):
+        """
+        optionally takes a dict loaded from file cache, loaded the CONTRACT_SNIPER part if available
+        modify input cache to point to initialized object if given
+        """
+        self.contracts: dict[int, dict[int, int]] = {}
+        if cache != None and CONTRACT_SNIPER in cache:
+            region_contracts = cache[CONTRACT_SNIPER]
+            for k, v in region_contracts.items():
+                self.contracts[int(k)] = {int(cid): t for cid, t in v.items()}
+        if cache != None:
+            cache[CONTRACT_SNIPER] = self
+        return
+
+    def trim(self):
+        for region_id in self.contracts:
+            if len(self.contracts[region_id]) <= LAST_CONTRACTS_TO_CACHE:
+                continue
+            contracts = [(cid, t) for cid, t in self.contracts[region_id].items()]
+            contracts.sort(key=lambda c: c[1], reverse=True)
+            self.contracts[region_id] = {
+                cid: t for cid, t in contracts[:LAST_CONTRACTS_TO_CACHE]
+            }
+        return
+
+    def to_json_serializable(self) -> dict[int, dict[int, int]]:
+        return self.contracts
+
+    def add_contract_seen(self, region_id: int, contract_id: int):
+        if region_id not in self.contracts:
+            self.contracts[region_id] = {}
+        self.contracts[region_id][contract_id] = int(time.time())
+        return
+
+    def is_contract_seen(self, region_id: int, contract_id: int) -> bool:
+        if region_id not in self.contracts:
+            return False
+        return contract_id in self.contracts[region_id]
 
 
 class ContractSniper(Core):
-    def __init__(self, *args, **kwargs):
-        # unlike orders, contracts are immutable upon creation, hence all contract seen can be added
-        self.contract_ids_seen = set()
+    def __init__(self, cache: dict = None, *args, **kwargs):
+        self.cache = ContractCache(cache)
         self.last_fetched: float = 0
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
@@ -48,7 +89,7 @@ class ContractSniper(Core):
             if contract["type"] != "item_exchange":
                 self.log.debug(f"Ignoring non item exchange contract {contract_id}")
                 continue
-            if contract_id in self.contract_ids_seen:
+            if self.cache.is_contract_seen(region_id, contract_id):
                 self.log.debug(f"Ignoring previously seen contract {contract_id}")
                 continue
             contracts.append(contract)
@@ -125,13 +166,8 @@ class ContractSniper(Core):
             return ""
         return res.json()["name"]
 
-    def watch_contract(self, cache: dict[str, list[int]] = None):
+    def watch_contract(self):
         """watch for low priced low volume contract"""
-        if cache != None and CONTRACT_SNIPER in cache:
-            self.contract_ids_seen = set(cache[CONTRACT_SNIPER])
-        if cache != None:
-            cache[CONTRACT_SNIPER] = self.contract_ids_seen
-
         if time.time() < self.last_fetched + MIN_PULL_INTERVAL:
             return self.log.info("Last pulled within ESI cache period, no op")
         self.last_fetched = time.time()
@@ -158,7 +194,7 @@ class ContractSniper(Core):
 
                 sold, requested = self.get_contract_items(contract_id)
                 if sold == "":
-                    self.contract_ids_seen.add(contract_id)
+                    self.cache.add_contract_seen(region_id, contract_id)
                     self.log.debug("Ignoring buy or BPC only contract")
                     continue
 
@@ -167,7 +203,7 @@ class ContractSniper(Core):
                 value = sold_price - requested_price
                 station_name, system_id, *_ = self.get_station_info(station_id)
                 system_name, security = self.get_system_info(system_id)
-                base_msg = (
+                msg = (
                     (f'Contract "{title}"' if title else "Item exchange contract")
                     + f" ({contract_id}) priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
                     + f"\n\tlocated in {station_name}, {system_name} (sec {security:.2}), {region_name}"
@@ -178,21 +214,18 @@ class ContractSniper(Core):
                         else ""
                     )
                 )
-                self.log.debug(base_msg)
+                self.log.debug(msg)
 
                 if (
                     sold_price * ARBITRAGE_THRESHOLD >= (price + requested_price)
                     and value >= MIN_VALUE_THRESHOLD
                 ):
                     issuer = self.get_character_name(issuer_id)
-                    msg = (
-                        f"The following contract by {issuer} is under valued, consider buying it\n"
-                        + base_msg
-                    )
+                    msg = f"{issuer}'s " + msg
                     self.log.info(msg)
                     self.send_notification(msg)
 
-                self.contract_ids_seen.add(contract_id)
+                self.cache.add_contract_seen(region_id, contract_id)
         return
 
     main = watch_contract

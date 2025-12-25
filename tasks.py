@@ -57,7 +57,7 @@ signal.signal(signal.SIGINT, handle_interrupt)
 if FEATURES[MARKET_MONITOR]:
     features.append(MarketMonitor(file_cache, threaded=event))
 if FEATURES[CONTRACT_SNIPER]:
-    features.append(ContractSniper(threaded=event))
+    features.append(ContractSniper(file_cache, threaded=event))
 
 for feature in features:
     t = threading.Thread(target=feature.run, args=(POLL_RATE,))
