@@ -4,7 +4,7 @@ import time
 from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
-from .core import Core, get_module_name
+from .core import BaseCache, Core, get_module_name
 
 MARKET_MONITOR = get_module_name(__name__)
 LAST_ORDER_TO_CACHE = 50
@@ -29,10 +29,56 @@ class ItemRecord:
         return
 
 
+class MarketCache(BaseCache):
+    def __init__(self, cache: dict = None):
+        """
+        optionally takes a dict loaded from file cache, loaded the MARKET_MONITOR part if available
+        modify input cache to point to initialized object if given
+        """
+        self.items: dict[int, ItemRecord] = {}
+        if cache != None and MARKET_MONITOR in cache:
+            items = cache[MARKET_MONITOR]
+            for item in items:
+                type_id, name, orders_seen = itemgetter(
+                    "type_id", "name", "orders_seen"
+                )(item)
+                self.items[type_id] = ItemRecord(
+                    type_id, name, {int(oid): t for oid, t in orders_seen.items()}
+                )
+        if cache != None:
+            cache[MARKET_MONITOR] = self
+        return
+
+    def add_order_seen(self, type_id: int, name: str, order_id: int):
+        if type_id not in self.items:
+            self.items[type_id] = ItemRecord(type_id=type_id, name=name)
+        self.items[type_id].orders_seen[order_id] = int(time.time())
+        return
+
+    def is_order_seen(self, type_id: int, order_id: int) -> bool:
+        if type_id not in self.items:
+            return False
+        return order_id in self.items[type_id].orders_seen
+
+    def trim(self):
+        targets = {t["type_id"] for t in load_targets()}
+        items = {}
+        for item in self.items.values():
+            if item.type_id not in targets:
+                continue
+            item.trim()
+            items[item.type_id] = item
+        self.items = items
+        return
+
+    def to_json_serializable(self) -> list:
+        return [dataclasses.asdict(item) for item in self.items.values()]
+
+
 class MarketMonitor(Core):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, cache: dict = None, *args, **kwargs):
         # only stores order_ids that has been sent to client
-        self.order_ids_seen = set()
+        self.cache = MarketCache(cache)
         return super().__init__(MARKET_MONITOR, *args, **kwargs)
 
     def get_region_info(self):
@@ -90,13 +136,8 @@ class MarketMonitor(Core):
             )
         return res
 
-    def watch_market(self, cache: dict[str, list[int]] = None):
+    def watch_market(self):
         """watch market orders for items in TARGETS.market_monitor"""
-        if cache != None and MARKET_MONITOR in cache:
-            self.order_ids_seen = set(cache[MARKET_MONITOR])
-        if cache != None:
-            cache[MARKET_MONITOR] = self.order_ids_seen
-
         # load each time to enable hot reload
         targets = load_targets()
         for target in targets:
@@ -118,6 +159,9 @@ class MarketMonitor(Core):
 
                 orders = self.get_item_orders_in_region(type_id, region_id)
                 orders_seen += len(orders)
+                self.log.debug(
+                    f"Found {len(orders)} orders for {name} in {region_name}"
+                )
                 for order in orders:
                     order_id, price, system_id, volume_remain, volume_total = (
                         itemgetter(
@@ -128,12 +172,14 @@ class MarketMonitor(Core):
                             "volume_total",
                         )(order)
                     )
-                    if price <= threshold and order_id not in self.order_ids_seen:
+                    if price <= threshold and not self.cache.is_order_seen(
+                        type_id, order_id
+                    ):
                         system = self.get_system_info(system_id)[0]
                         msg = f"{name} selling for {price:,.0f} isk in {system}, {region_name}, {volume_remain}/{volume_total}"
                         self.log.info(msg)
                         self.send_notification(msg)
-                        self.order_ids_seen.add(order_id)
+                        self.cache.add_order_seen(type_id, name, order_id)
 
             if orders_seen == 0:
                 self.log.warning(f"Done looking for {name}, no order found")

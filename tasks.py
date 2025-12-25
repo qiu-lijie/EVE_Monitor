@@ -8,6 +8,7 @@ import time
 
 from eve_monitor.constants import SETTINGS
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
+from eve_monitor.core import BaseCache
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
 logging.basicConfig(
@@ -29,15 +30,15 @@ threads = []
 
 def dump_cache(cache: dict[str, list[str]]):
     """cleanup then dump cache to file system"""
-    # CACHE_LIMIT = 100 TODO some better clean up
-    # for k in cache:
-    #     if len(cache[k]) > CACHE_LIMIT:
-    #         cache[k] = cache[k][-CACHE_LIMIT:]
     for k in cache:
-        if type(cache[k]) == set:
-            cache[k] = list(cache[k])
-
-    json.dump(cache, open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
+        if issubclass(type(cache[k]), BaseCache):
+            cache[k].trim()
+    json.dump(
+        cache,
+        open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"),
+        indent=4,
+        default=lambda c: c.to_json_serializable(),
+    )
     return
 
 
@@ -54,12 +55,12 @@ def handle_interrupt(_, __):
 signal.signal(signal.SIGINT, handle_interrupt)
 
 if FEATURES[MARKET_MONITOR]:
-    features.append(MarketMonitor(threaded=event))
+    features.append(MarketMonitor(file_cache, threaded=event))
 if FEATURES[CONTRACT_SNIPER]:
     features.append(ContractSniper(threaded=event))
 
 for feature in features:
-    t = threading.Thread(target=feature.run, args=(POLL_RATE, file_cache))
+    t = threading.Thread(target=feature.run, args=(POLL_RATE,))
     t.start()
     threads.append(t)
 

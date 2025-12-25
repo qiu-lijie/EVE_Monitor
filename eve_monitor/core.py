@@ -22,6 +22,18 @@ def get_module_name(name: str) -> str:
     return name[name.rfind(".") + 1 :]
 
 
+class BaseCache(abc.ABC):
+    @abc.abstractmethod
+    def trim(self):
+        """trim cache to keep size manageable"""
+        return
+
+    @abc.abstractmethod
+    def to_json_serializable(self) -> str:
+        """return a json serializable representation of the cache"""
+        return ""
+
+
 class Core(abc.ABC):
     def __init__(
         self,
@@ -37,16 +49,16 @@ class Core(abc.ABC):
         return
 
     @abc.abstractmethod
-    def main(self, cache):
+    def main(self):
         """used by self.run in it's main loop"""
         return
 
-    def run(self, poll_rate: int, cache: dict = None):
+    def run(self, poll_rate: int):
         # creates the cursor as SQLite objects created in a thread can only be used in that same thread
         self.cur = sqlite3.connect(DB_PATH).cursor()
         try:
             while True:
-                self.main(cache)
+                self.main()
                 self.log.info("sleeping")
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
