@@ -1,10 +1,32 @@
+import dataclasses
 import json
+import time
 from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
 from .core import Core, get_module_name
 
 MARKET_MONITOR = get_module_name(__name__)
+LAST_ORDER_TO_CACHE = 50
+
+
+def load_targets() -> list[dict]:
+    return json.load(open(TARGETS_JSON))[MARKET_MONITOR]
+
+
+@dataclasses.dataclass
+class ItemRecord:
+    type_id: int
+    name: str
+    orders_seen: dict[int, int] = dataclasses.field(default_factory=dict)
+
+    def trim(self):
+        if len(self.orders_seen) <= LAST_ORDER_TO_CACHE:
+            return
+        orders = [(oid, t) for oid, t in self.orders_seen.items()]
+        orders.sort(key=lambda o: o[1], reverse=True)
+        self.orders_seen = {oid: t for oid, t in orders[:LAST_ORDER_TO_CACHE]}
+        return
 
 
 class MarketMonitor(Core):
@@ -76,7 +98,7 @@ class MarketMonitor(Core):
             cache[MARKET_MONITOR] = self.order_ids_seen
 
         # load each time to enable hot reload
-        targets = json.load(open(TARGETS_JSON))[MARKET_MONITOR]
+        targets = load_targets()
         for target in targets:
             orders_seen = 0
             tar_region_id = target.get("region", None)
