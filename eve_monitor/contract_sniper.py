@@ -184,8 +184,10 @@ class ContractSniper(Core):
             if not known_space:
                 continue
 
-            self.log.info(f"Looking for contracts in {region_id} {region_name}")
             contracts = self.search_contract_in_region(region_id)
+            self.log.info(
+                f"Found {len(contracts)} unseen contracts in {region_name} ({region_id})"
+            )
             for contract in contracts:
                 contract_id, issuer_id, price, title, volume, station_id = itemgetter(
                     "contract_id",
