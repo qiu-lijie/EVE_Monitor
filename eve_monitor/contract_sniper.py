@@ -104,8 +104,7 @@ class ContractSniper(Core):
             return ("", "")
 
         items = res.json()
-        sold = ""
-        requested = ""
+        sold, requested = "", ""
         for item in items:
             if item.get("is_blueprint_copy", False):
                 continue
@@ -166,6 +165,12 @@ class ContractSniper(Core):
             return ""
         return res.json()["name"]
 
+    def should_ignore_unseen_contract(self, sold: str) -> bool:
+        """ignores contracts returned no parsed sold item, or only one single PLEX item"""
+        return sold == "" or (
+            sold[: sold.find("\t")] == "PLEX" and sold[sold.find("\n") :] == "\n"
+        )
+
     def watch_contract(self):
         """watch for low priced low volume contract"""
         if time.time() < self.last_fetched + MIN_PULL_INTERVAL:
@@ -193,9 +198,9 @@ class ContractSniper(Core):
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
                 sold, requested = self.get_contract_items(contract_id)
-                if sold == "":
+                if self.should_ignore_unseen_contract(sold):
+                    self.log.debug(f"Ignoring buy or BPC only contract {contract_id}")
                     self.cache.add_contract_seen(region_id, contract_id)
-                    self.log.debug("Ignoring buy or BPC only contract")
                     continue
 
                 sold_price = self.get_appraisal_value(sold)
