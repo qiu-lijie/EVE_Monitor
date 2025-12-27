@@ -121,9 +121,11 @@ class Core(abc.ABC):
             )
         return res
 
-    def page_aware_get(self, url: str, last_n_page: int = float("inf")) -> list:
+    def page_aware_get(
+        self, url: str, last_n_page: int = float("inf"), *args, **kwargs
+    ) -> list:
         """return a list of objects over potentially many pages, only keeping last n pages"""
-        res = self.get(url, (200, 304))
+        res = self.get(url, (200, 304), *args, **kwargs)
         if res.status_code != 200 or len(res.content) == 0:
             return []
         if ESI_PAGE_KEY not in res.headers:
@@ -134,7 +136,7 @@ class Core(abc.ABC):
         contents = res.json() if curr_page == 1 else []
         while curr_page < total_pages:
             curr_page += 1
-            res = self.get(url, params={"page": curr_page})
+            res = self.get(url, params={"page": curr_page}, *args, **kwargs)
             if res.status_code == 200 and len(res.content) > 0:
                 contents += res.json()
         return contents

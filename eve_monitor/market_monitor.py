@@ -116,25 +116,12 @@ class MarketMonitor(Core):
         Get the given item orders in given region
         Args:
             order_type (str): one of "buy", "sell", "all"; default to sell
-        Returns:
-            Returns list of order found, [] otherwise
-        Note, no pagination as the assumption is there will be less then 1000 orders for any given type
-            as ESI page size seems to be 1000. Only really matter for PLEX
+        Returns a list of order found, [] otherwise
         """
-        res = self.get(
+        return self.page_aware_get(
             ESI_URL + f"/markets/{region_id}/orders/",
-            200,
             params={"type_id": type_id, "order_type": order_type},
         )
-        if res.status_code != 200:
-            return []
-
-        res = res.json()
-        if len(res) >= 1000:
-            self.log.warning(
-                f"fetching for type {type_id} in region {region_id} returns more than 1000 orders"
-            )
-        return res
 
     def watch_market(self):
         """watch market orders for items in TARGETS.market_monitor"""

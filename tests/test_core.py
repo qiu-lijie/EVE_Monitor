@@ -34,7 +34,7 @@ class TestCorePageAwareGet:
         for page in range(1, n_pages + 1):
             responses[page] = self.basic_response(n_pages, 200, [{"id": page}])
 
-        def side_effect(_, params={}):
+        def side_effect(_, params={}, **__):
             page = params.get("page", 1)
             return responses[page]
 
@@ -81,13 +81,19 @@ class TestCorePageAwareGet:
     def test_page_aware_get_failed_page_request(self, core, session):
         """Test handles failed page requests gracefully"""
         mock_resp1 = self.basic_response(3, 200, [{"id": 1}])
-
-        mock_resp2 = Mock()
-        mock_resp2.status_code = 500
-
+        mock_resp2 = self.basic_response(1, 500)
         session.get.side_effect = [mock_resp1, mock_resp2, mock_resp1]
 
         result = core.page_aware_get(URL)
         # note the current behaviour is to skip that page and keep going
         assert result == [{"id": 1}, {"id": 1}]
         assert session.get.call_count == 3
+
+    def test_page_aware_get_with_kwargs(self, core, session):
+        """Test passing additional kwargs to get method"""
+        self.setup_multiple_pages(session, 2)
+
+        result = core.page_aware_get(URL, headers={"Authorization": "Bearer token"})
+        assert result == [{"id": 1}, {"id": 2}]
+        assert session.get.call_count == 2
+        session.get.assert_any_call(URL, headers={"Authorization": "Bearer token"})
