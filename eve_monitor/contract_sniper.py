@@ -8,7 +8,7 @@ CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
 MIN_VALUE_THRESHOLD = 100_000_000
 MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
-LAST_CONTRACTS_TO_CACHE = 3000  # 1000 per page, last 3 pages
+LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
 
 
 class ContractCache(BaseCache):
@@ -60,29 +60,7 @@ class ContractSniper(Core):
 
     def search_contract_in_region(self, region_id: int) -> list[dict]:
         """returns all unseen item exchange contracts in a region"""
-        # TODO make use of Etag and If-None-Match maybe?
-        res = self.get(ESI_URL + f"/contracts/public/{region_id}", 200)
-        if res.status_code != 200:
-            return []
-
-        curr_page = 1
-        curr_content = res.json()
-        while res.status_code == 200:
-            prev_content = curr_content
-            curr_content = res.json()
-            curr_page += 1
-            self.log.debug(f"Attempting next page {curr_page}")
-            res = self.get(
-                ESI_URL + f"/contracts/public/{region_id}",
-                (200, 404),
-                params={"page": curr_page},
-            )
-
-        if curr_page == 2:
-            content = curr_content
-        else:
-            content = prev_content + curr_content
-
+        content = self.page_aware_get(ESI_URL + f"/contracts/public/{region_id}", 2)
         contracts = []
         for contract in content:
             contract_id = contract["contract_id"]
@@ -99,11 +77,10 @@ class ContractSniper(Core):
         """returns a tuple of (items sold, items requested), ignoring blue print copy"""
         # since contracts routes are cached for longer, sometimes we are querying already completed contracts
         # ESI either returns 204, or 200 with empty content
-        res = self.get(ESI_URL + f"/contracts/public/items/{contract_id}", (200, 204))
-        if res.status_code != 200 or len(res.content) == 0:
+        items = self.page_aware_get(ESI_URL + f"/contracts/public/items/{contract_id}")
+        if items == []:
             return ("", "")
 
-        items = res.json()
         sold, requested = "", ""
         for item in items:
             if item.get("is_blueprint_copy", False):

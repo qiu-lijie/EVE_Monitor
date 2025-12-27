@@ -22,6 +22,7 @@ class TestContractSniper:
             == False
         )
 
+    # TODO write some integration tests
     # def test_(self, contract_sniper):
     #     assert True == contract_sniper.should_ignore_unseen_contract(contract_sniper.get_contract_items(226413101)[0])
     #     assert False == contract_sniper.should_ignore_unseen_contract(contract_sniper.get_contract_items(226414056)[0])

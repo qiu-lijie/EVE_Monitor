@@ -16,6 +16,8 @@ from .constants import (
     PUSHOVER_NOTIFICATION,
 )
 
+ESI_PAGE_KEY = "X-Pages"
+
 
 def get_module_name(name: str) -> str:
     """get module name for use as constant"""
@@ -118,6 +120,24 @@ class Core(abc.ABC):
                 f"Request failed at {res.url}, status code {res.status_code}\n\t{res.content}"
             )
         return res
+
+    def page_aware_get(self, url: str, last_n_page: int = float("inf")) -> list:
+        """return a list of objects over potentially many pages, only keeping last n pages"""
+        res = self.get(url, (200, 304))
+        if res.status_code != 200 or len(res.content) == 0:
+            return []
+        if ESI_PAGE_KEY not in res.headers:
+            return res.json()
+
+        total_pages = int(res.headers.get(ESI_PAGE_KEY, 1))
+        curr_page = max(1, total_pages - last_n_page)
+        contents = res.json() if curr_page == 1 else []
+        while curr_page < total_pages:
+            curr_page += 1
+            res = self.get(url, params={"page": curr_page})
+            if res.status_code == 200 and len(res.content) > 0:
+                contents += res.json()
+        return contents
 
     def post(
         self,
