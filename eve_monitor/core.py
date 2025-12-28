@@ -48,6 +48,7 @@ class Core(abc.ABC):
         if not threaded:
             self.cur = sqlite3.connect(DB_PATH).cursor()
         self.log = logging.getLogger(log_name)
+        self.get_etags: dict[str, str] = {}
         return
 
     @abc.abstractmethod
@@ -111,14 +112,20 @@ class Core(abc.ABC):
         *args,
         **kwargs,
     ) -> requests.Response:
-        """logs a warning if unexpected status code is received"""
+        """logs a warning if unexpected status code is received, transparently handles ETag caching"""
         if type(excepted_status_codes) == int:
             excepted_status_codes = (excepted_status_codes,)
+        if url in self.get_etags:
+            if "headers" not in kwargs:
+                kwargs["headers"] = {}
+            kwargs["headers"]["If-None-Match"] = self.get_etags[url]
         res = self.s.get(url, *args, **kwargs)
         if res.status_code not in excepted_status_codes:
             self.log.warning(
                 f"Request failed at {res.url}, status code {res.status_code}\n\t{res.content}"
             )
+        if "ETag" in res.headers:
+            self.get_etags[url] = res.headers["ETag"]
         return res
 
     def page_aware_get(
