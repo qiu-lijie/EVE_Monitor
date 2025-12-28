@@ -4,6 +4,9 @@ import requests
 import sqlite3
 import sys
 import threading
+import time
+from calendar import timegm
+from email.utils import parsedate
 from plyer import notification
 
 from .constants import (
@@ -49,6 +52,7 @@ class Core(abc.ABC):
             self.cur = sqlite3.connect(DB_PATH).cursor()
         self.log = logging.getLogger(log_name)
         self.get_etags: dict[str, str] = {}
+        self.next_poll: int | float = float("inf")
         return
 
     @abc.abstractmethod
@@ -61,8 +65,10 @@ class Core(abc.ABC):
         self.cur = sqlite3.connect(DB_PATH).cursor()
         try:
             while True:
-                self.main()
-                self.log.info("sleeping")
+                if time.time() >= self.next_poll or self.next_poll == float("inf"):
+                    self.next_poll = float("inf")
+                    self.main()
+                    self.log.info("sleeping")
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
                     break
@@ -129,21 +135,43 @@ class Core(abc.ABC):
         return res
 
     def page_aware_get(
-        self, url: str, last_n_page: int = float("inf"), *args, **kwargs
+        self,
+        url: str,
+        last_n_page: int = float("inf"),
+        update_next_poll: bool = False,
+        *args,
+        **kwargs,
     ) -> list:
         """return a list of objects over potentially many pages, only keeping last n pages"""
-        res = self.get(url, (200, 304), *args, **kwargs)
+        expected_status_codes = (200, 304)
+        if "expected_status_codes" in kwargs:
+            expected_status_codes = (
+                *expected_status_codes,
+                *kwargs.pop("expected_status_codes"),
+            )
+        res = self.get(url, expected_status_codes, *args, **kwargs)
         if res.status_code != 200 or len(res.content) == 0:
             return []
         if ESI_PAGE_KEY not in res.headers:
             return res.json()
+
+        EXPIRES = "Expires"
+        if update_next_poll and EXPIRES in res.headers:
+            expiry = timegm(parsedate(res.headers[EXPIRES]))
+            next_poll = min(self.next_poll, expiry)
+            self.log.debug(
+                f"resource expiry {expiry}, next poll {self.next_poll} -> {next_poll}"
+            )
+            self.next_poll = next_poll
 
         total_pages = int(res.headers.get(ESI_PAGE_KEY, 1))
         curr_page = max(1, total_pages - last_n_page)
         contents = res.json() if curr_page == 1 else []
         while curr_page < total_pages:
             curr_page += 1
-            res = self.get(url, params={"page": curr_page}, *args, **kwargs)
+            res = self.get(
+                url, expected_status_codes, params={"page": curr_page}, *args, **kwargs
+            )
             if res.status_code == 200 and len(res.content) > 0:
                 contents += res.json()
         return contents

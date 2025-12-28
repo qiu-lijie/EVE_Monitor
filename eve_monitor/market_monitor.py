@@ -120,6 +120,7 @@ class MarketMonitor(Core):
         """
         return self.page_aware_get(
             ESI_URL + f"/markets/{region_id}/orders/",
+            update_next_poll=True,
             params={"type_id": type_id, "order_type": order_type},
         )
 

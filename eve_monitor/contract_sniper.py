@@ -7,7 +7,6 @@ from .core import BaseCache, Core, get_module_name
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
 MIN_VALUE_THRESHOLD = 100_000_000
-MIN_PULL_INTERVAL = 30 * 60  # cached for 30 min on ESI side
 LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
 
 
@@ -55,12 +54,13 @@ class ContractCache(BaseCache):
 class ContractSniper(Core):
     def __init__(self, cache: dict = None, *args, **kwargs):
         self.cache = ContractCache(cache)
-        self.last_fetched: float = 0
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
     def search_contract_in_region(self, region_id: int) -> list[dict]:
         """returns all unseen item exchange contracts in a region"""
-        content = self.page_aware_get(ESI_URL + f"/contracts/public/{region_id}", 2)
+        content = self.page_aware_get(
+            ESI_URL + f"/contracts/public/{region_id}", 2, True
+        )
         contracts = []
         for contract in content:
             contract_id = contract["contract_id"]
@@ -75,9 +75,12 @@ class ContractSniper(Core):
 
     def get_contract_items(self, contract_id: int) -> tuple[str, str]:
         """returns a tuple of (items sold, items requested), ignoring blue print copy"""
-        # since contracts routes are cached for longer, sometimes we are querying already completed contracts
-        # ESI either returns 204, or 200 with empty content
-        items = self.page_aware_get(ESI_URL + f"/contracts/public/items/{contract_id}")
+        items = self.page_aware_get(
+            ESI_URL + f"/contracts/public/items/{contract_id}",
+            # since contracts routes are cached for longer, sometimes we are querying already completed contracts
+            # ESI either returns 204, or 200 with empty content
+            expected_status_codes=(200, 204),
+        )
         if items == []:
             return ("", "")
 
@@ -135,12 +138,18 @@ class ContractSniper(Core):
             else res["effectivePrices"]["totalBuyPrice"]
         )
 
+    character_name_cache: dict[int, str] = {}
+
     def get_character_name(self, character_id: int) -> str:
         """Returns the character name of given character id, "" otherwise"""
+        if character_id in self.character_name_cache:
+            return self.character_name_cache[character_id]
         res = self.get(ESI_URL + f"/characters/{character_id}/", 200)
         if res.status_code != 200:
             return ""
-        return res.json()["name"]
+        name = res.json()["name"]
+        self.character_name_cache[character_id] = name
+        return name
 
     def should_ignore_unseen_contract(self, sold: str) -> bool:
         """ignores contracts returned no parsed sold item, or only one single PLEX item"""
@@ -150,10 +159,6 @@ class ContractSniper(Core):
 
     def watch_contract(self):
         """watch for low priced low volume contract"""
-        if time.time() < self.last_fetched + MIN_PULL_INTERVAL:
-            return self.log.info("Last pulled within ESI cache period, no op")
-        self.last_fetched = time.time()
-
         for region in REGIONS:
             region_name, region_id, known_space = itemgetter(
                 "name", "region_id", "known_space"

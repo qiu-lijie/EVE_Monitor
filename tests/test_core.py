@@ -125,3 +125,19 @@ class TestCore:
         assert session.get.call_count == 2
         session.get.assert_any_call(URL, headers={"Authorization": "Bearer token"})
         return
+
+    def test_page_aware_get_update_next_poll(self, core, session):
+        """Test updating next_poll based on Expires header"""
+        mock_resp1 = self.basic_response(2, 200, [{"id": 1}])
+        mock_resp1.headers["Expires"] = "Tue, 21 Oct 2025 07:28:00 GMT"
+        mock_resp2 = self.basic_response(2, 200, [{"id": 2}])
+        mock_resp2.headers["Expires"] = "Tue, 21 Oct 2025 08:28:00 GMT"
+        session.get.side_effect = [mock_resp1, mock_resp2]
+
+        result = core.page_aware_get(URL, update_next_poll=True)
+        assert result == [{"id": 1}, {"id": 2}]
+        assert session.get.call_count == 2
+
+        expected_expiry = 1761031680  # Epoch time for "Tue, 21 Oct 2025 07:28:00 GMT"
+        assert core.next_poll == expected_expiry
+        return
