@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import threading
 import time
+import traceback
 from calendar import timegm
 from email.utils import parsedate
 from plyer import notification
@@ -17,6 +18,7 @@ from .constants import (
     USER_KEY,
     DESKTOP_NOTIFICATION,
     PUSHOVER_NOTIFICATION,
+    DEBUG,
 )
 
 ESI_PAGE_KEY = "X-Pages"
@@ -42,15 +44,17 @@ class BaseCache(abc.ABC):
 class Core(abc.ABC):
     def __init__(
         self,
-        log_name: str,
+        name: str,
         session: requests.Session = None,
         threaded: threading.Event = False,
     ):
+        self.name = name
+        self.log = logging.getLogger(name)
         self.s = session if session else requests.Session()
         self.threaded = threaded
         if not threaded:
             self.cur = sqlite3.connect(DB_PATH).cursor()
-        self.log = logging.getLogger(log_name)
+
         self.get_etags: dict[str, str] = {}
         self.next_poll: int | float = float("inf")
         return
@@ -80,6 +84,11 @@ class Core(abc.ABC):
                     self.log.info("Interrupt received, exiting")
                     break
         except:
+            if not DEBUG:
+                error_trace = traceback.format_exc()
+                self.send_notification(
+                    f"Unexpected error occurred in {self.name}\n{error_trace}"
+                )
             self.log.exception("Unexpected error occurred")
         return
 
@@ -93,8 +102,7 @@ class Core(abc.ABC):
                         message=msg[:256],
                         app_name=TITLE,
                     )
-                # TODO add mac support
-                else:
+                else:  # TODO add mac support
                     self.log.warning(
                         "No supported desktop notification implementation found"
                     )

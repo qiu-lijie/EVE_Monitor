@@ -2,6 +2,7 @@
     "APP_TOKEN": "<Pushover app token>",
     "USER_KEY": "<Pushover user key>",
     "DB_PATH": "<Path to local db>",
+    "DEBUG": false,
     "poll_rate_in_min": 5,
     "features_enabled": {
         "market_monitor": false,

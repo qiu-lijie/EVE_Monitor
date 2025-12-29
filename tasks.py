@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from eve_monitor.constants import SETTINGS
+from eve_monitor.constants import SETTINGS, DEBUG
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
 from eve_monitor.core import BaseCache
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
@@ -36,7 +36,7 @@ def dump_cache(cache: dict[str, list[str]]):
     json.dump(
         cache,
         open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"),
-        indent=4,
+        indent=4 if DEBUG else None,
         default=lambda c: c.to_json_serializable(),
     )
     return
