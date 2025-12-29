@@ -68,7 +68,9 @@ class Core(abc.ABC):
                 if time.time() >= self.next_poll or self.next_poll == float("inf"):
                     self.next_poll = float("inf")
                     self.main()
-                    self.log.info("sleeping")
+                    self.log.info(
+                        f"sleeping, next poll after {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.next_poll))}"
+                    )
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
                     break
