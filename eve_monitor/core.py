@@ -21,6 +21,9 @@ from .constants import (
     DEBUG,
 )
 
+INIT_BACKOFF = 60
+MAX_BACKOFF = 32 * 60
+MAX_ERROR_NOTIFICATIONS = 3
 ESI_PAGE_KEY = "X-Pages"
 
 
@@ -67,8 +70,11 @@ class Core(abc.ABC):
     def run(self, poll_rate: int):
         # creates the cursor as SQLite objects created in a thread can only be used in that same thread
         self.cur = sqlite3.connect(DB_PATH).cursor()
-        try:
-            while True:
+
+        error_notifications = 0
+        backoff = INIT_BACKOFF
+        while True:
+            try:
                 if time.time() >= self.next_poll or self.next_poll == float("inf"):
                     self.next_poll = float("inf")
                     self.main()
@@ -80,16 +86,23 @@ class Core(abc.ABC):
                         self.log.info(
                             f"sleeping, next poll after {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.next_poll))}"
                         )
+                error_notifications = 0
+                backoff = INIT_BACKOFF
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
                     break
-        except:
-            if not DEBUG:
-                error_trace = traceback.format_exc()
-                self.send_notification(
-                    f"Unexpected error occurred in {self.name}\n{error_trace}"
-                )
-            self.log.exception("Unexpected error occurred")
+            except:
+                if not DEBUG and error_notifications < MAX_ERROR_NOTIFICATIONS:
+                    error_trace = traceback.format_exc()
+                    self.send_notification(
+                        f"Unexpected error occurred in {self.name}\n{error_trace}"
+                    )
+                    error_notifications += 1
+                self.log.exception("Unexpected error occurred")
+                self.log.warning(f"backing off {backoff}s")
+                if self.threaded.wait(backoff):
+                    break
+                backoff = min(backoff * 2, MAX_BACKOFF)
         return
 
     def send_notification(self, msg: str):
