@@ -68,9 +68,14 @@ class Core(abc.ABC):
                 if time.time() >= self.next_poll or self.next_poll == float("inf"):
                     self.next_poll = float("inf")
                     self.main()
-                    self.log.info(
-                        f"sleeping, next poll after {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.next_poll))}"
-                    )
+                    if self.next_poll == float("inf"):
+                        self.log.warning(
+                            "No next poll time fetched, defaulting to fixed interval polling"
+                        )
+                    else:
+                        self.log.info(
+                            f"sleeping, next poll after {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.next_poll))}"
+                        )
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
                     break
@@ -152,10 +157,6 @@ class Core(abc.ABC):
                 *kwargs.pop("expected_status_codes"),
             )
         res = self.get(url, expected_status_codes, *args, **kwargs)
-        if res.status_code != 200 or len(res.content) == 0:
-            return []
-        if ESI_PAGE_KEY not in res.headers:
-            return res.json()
 
         EXPIRES = "Expires"
         if update_next_poll and EXPIRES in res.headers:
@@ -165,6 +166,11 @@ class Core(abc.ABC):
                 f"resource expiry {expiry}, next poll {self.next_poll} -> {next_poll}"
             )
             self.next_poll = next_poll
+
+        if res.status_code != 200 or len(res.content) == 0:
+            return []
+        if ESI_PAGE_KEY not in res.headers:
+            return res.json()
 
         total_pages = int(res.headers.get(ESI_PAGE_KEY, 1))
         curr_page = max(1, total_pages - last_n_page)
