@@ -99,9 +99,9 @@ class ContractSniper(Core):
                 (type_id,),
             )
             res = self.cur.fetchone()
-            if not res:  # TODO temp fix, try to see if abyssal mods can be added to DB
+            if not res:
                 self.log.warning(
-                    f"typeID {type_id} not found, likely abyssal related item"
+                    f"typeID {type_id} not found, please update local database"
                 )
                 continue
 

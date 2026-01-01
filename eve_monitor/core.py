@@ -91,6 +91,11 @@ class Core(abc.ABC):
                 if self.threaded.wait(poll_rate * 60):
                     self.log.info("Interrupt received, exiting")
                     break
+            except requests.exceptions.ConnectionError:
+                self.log.warning(f"Connection error, backing off {backoff}s")
+                if self.threaded.wait(backoff):
+                    break
+                backoff = min(backoff * 2, MAX_BACKOFF)
             except:
                 if not DEBUG and error_notifications < MAX_ERROR_NOTIFICATIONS:
                     error_trace = traceback.format_exc()

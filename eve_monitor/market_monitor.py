@@ -170,7 +170,7 @@ class MarketMonitor(Core):
                         self.cache.add_order_seen(type_id, name, order_id)
 
             if orders_seen == 0:
-                self.log.warning(f"Done looking for {name}, no order found")
+                self.log.info(f"Done looking for {name}, no order found")
         return
 
     main = watch_market
