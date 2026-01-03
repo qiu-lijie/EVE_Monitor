@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from eve_monitor.constants import SETTINGS, DEBUG
+from eve_monitor.constants import SETTINGS, DEBUG, SETTINGS_DIR
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
 from eve_monitor.core import BaseCache
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
@@ -18,7 +18,7 @@ logging.getLogger("urllib3").setLevel(logging.INFO)
 
 FEATURES = SETTINGS["features_enabled"]
 POLL_RATE = SETTINGS["poll_rate_in_min"]
-CACHE_JSON = "cache.json"
+CACHE_JSON = SETTINGS_DIR + "cache.json"
 if not os.path.exists(CACHE_JSON):
     json.dump({}, open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
 
