@@ -8,7 +8,7 @@ import time
 
 from eve_monitor.constants import SETTINGS, DEBUG, SETTINGS_DIR
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
-from eve_monitor.core import BaseCache
+from eve_monitor.core import BaseHistory
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
 logging.basicConfig(
@@ -18,24 +18,24 @@ logging.getLogger("urllib3").setLevel(logging.INFO)
 
 FEATURES = SETTINGS["features_enabled"]
 POLL_RATE = SETTINGS["poll_rate_in_min"]
-CACHE_JSON = SETTINGS_DIR + "cache.json"
-if not os.path.exists(CACHE_JSON):
-    json.dump({}, open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
+HISTORY_JSON = SETTINGS_DIR + "history.json"
+if not os.path.exists(HISTORY_JSON):
+    json.dump({}, open(HISTORY_JSON, "w+", encoding="utf-8", newline="\n"), indent=4)
 
-file_cache = json.load(open(CACHE_JSON, "r", encoding="utf-8"))
+history_file = json.load(open(HISTORY_JSON, "r", encoding="utf-8"))
 event = threading.Event()
 features = []
 threads = []
 
 
-def dump_cache(cache: dict[str, list[str]]):
-    """cleanup then dump cache to file system"""
-    for k in cache:
-        if issubclass(type(cache[k]), BaseCache):
-            cache[k].trim()
+def dump_history(history: dict[str, list[str]]):
+    """cleanup then dump history to file system"""
+    for k in history:
+        if issubclass(type(history[k]), BaseHistory):
+            history[k].trim()
     json.dump(
-        cache,
-        open(CACHE_JSON, "w+", encoding="utf-8", newline="\n"),
+        history,
+        open(HISTORY_JSON, "w+", encoding="utf-8", newline="\n"),
         indent=4 if DEBUG else None,
         default=lambda c: c.to_json_serializable(),
     )
@@ -43,11 +43,11 @@ def dump_cache(cache: dict[str, list[str]]):
 
 
 def handle_interrupt(_, __):
-    """dump file cache then exist when interrupt"""
+    """dump file history then exist when interrupt"""
     event.set()
     for thread in threads:
         thread.join()
-    dump_cache(file_cache)
+    dump_history(history_file)
     sys.exit(0)
     return
 
@@ -55,9 +55,9 @@ def handle_interrupt(_, __):
 signal.signal(signal.SIGINT, handle_interrupt)
 
 if FEATURES[MARKET_MONITOR]:
-    features.append(MarketMonitor(file_cache, threaded=event))
+    features.append(MarketMonitor(history_file, threaded=event))
 if FEATURES[CONTRACT_SNIPER]:
-    features.append(ContractSniper(file_cache, threaded=event))
+    features.append(ContractSniper(history_file, threaded=event))
 
 for feature in features:
     t = threading.Thread(target=feature.run, args=(POLL_RATE,))

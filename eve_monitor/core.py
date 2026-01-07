@@ -32,15 +32,15 @@ def get_module_name(name: str) -> str:
     return name[name.rfind(".") + 1 :]
 
 
-class BaseCache(abc.ABC):
+class BaseHistory(abc.ABC):
     @abc.abstractmethod
     def trim(self):
-        """trim cache to keep size manageable"""
+        """trim history to keep size manageable"""
         return
 
     @abc.abstractmethod
     def to_json_serializable(self) -> object:
-        """return a json serializable representation of the cache"""
+        """return a json serializable representation of the history"""
         return object()
 
 

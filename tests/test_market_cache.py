@@ -5,7 +5,7 @@ from eve_monitor.market_monitor import (
     LAST_ORDER_TO_CACHE,
     MARKET_MONITOR,
     ItemRecord,
-    MarketCache,
+    MarketHistory,
 )
 
 
@@ -37,17 +37,17 @@ class TestItemRecord:
         assert all(v >= (10 * 10) for v in item.orders_seen.values())
 
 
-class TestMarketCache:
+class TestMarketHistory:
     @pytest.fixture
-    def cache(self):
-        return MarketCache()
+    def history(self):
+        return MarketHistory()
 
-    def test_init_empty(self, cache):
-        assert isinstance(cache.items, dict)
-        assert len(cache.items) == 0
+    def test_init_empty(self, history):
+        assert isinstance(history.items, dict)
+        assert len(history.items) == 0
 
-    def test_init_with_cached_data(self):
-        cached_data = {
+    def test_init_with_history_data(self):
+        history_data = {
             MARKET_MONITOR: [
                 {
                     "type_id": 34,
@@ -56,51 +56,51 @@ class TestMarketCache:
                 }
             ]
         }
-        cache = MarketCache(cached_data)
-        assert 34 in cache.items
-        assert cache.items[34].type_id == 34
-        assert cache.items[34].name == "Tritanium"
-        assert cache.items[34].orders_seen == {1: 100, 2: 200}
-        assert cached_data[MARKET_MONITOR] is cache
+        history = MarketHistory(history_data)
+        assert 34 in history.items
+        assert history.items[34].type_id == 34
+        assert history.items[34].name == "Tritanium"
+        assert history.items[34].orders_seen == {1: 100, 2: 200}
+        assert history_data[MARKET_MONITOR] is history
 
     def test_init_modifies_input_dict(self):
-        cached_data = {MARKET_MONITOR: []}
-        cache = MarketCache(cached_data)
-        assert cached_data[MARKET_MONITOR] is cache
+        history_data = {MARKET_MONITOR: []}
+        history = MarketHistory(history_data)
+        assert history_data[MARKET_MONITOR] is history
 
-    def test_add_order_seen_new_item(self, cache):
+    def test_add_order_seen_new_item(self, history):
         time_before = int(time.time())
-        cache.add_order_seen(34, "Tritanium", 1001)
+        history.add_order_seen(34, "Tritanium", 1001)
         time_after = int(time.time())
-        assert 34 in cache.items
-        assert cache.items[34].name == "Tritanium"
-        assert 1001 in cache.items[34].orders_seen
-        assert time_before <= cache.items[34].orders_seen[1001] <= time_after
+        assert 34 in history.items
+        assert history.items[34].name == "Tritanium"
+        assert 1001 in history.items[34].orders_seen
+        assert time_before <= history.items[34].orders_seen[1001] <= time_after
 
-    def test_add_order_seen_existing_item(self, cache):
-        cache.add_order_seen(34, "Tritanium", 1001)
-        cache.add_order_seen(34, "Tritanium", 1002)
-        assert len(cache.items[34].orders_seen) == 2
-        assert 1001 in cache.items[34].orders_seen
-        assert 1002 in cache.items[34].orders_seen
+    def test_add_order_seen_existing_item(self, history):
+        history.add_order_seen(34, "Tritanium", 1001)
+        history.add_order_seen(34, "Tritanium", 1002)
+        assert len(history.items[34].orders_seen) == 2
+        assert 1001 in history.items[34].orders_seen
+        assert 1002 in history.items[34].orders_seen
 
-    def test_is_order_seen_not_seen(self, cache):
-        assert cache.is_order_seen(34, 1001) is False
+    def test_is_order_seen_not_seen(self, history):
+        assert history.is_order_seen(34, 1001) is False
 
-    def test_is_order_seen_seen(self, cache):
-        cache.add_order_seen(34, "Tritanium", 1001)
-        assert cache.is_order_seen(34, 1001) is True
+    def test_is_order_seen_seen(self, history):
+        history.add_order_seen(34, "Tritanium", 1001)
+        assert history.is_order_seen(34, 1001) is True
 
-    def test_is_order_seen_different_type_id(self, cache):
-        cache.add_order_seen(34, "Tritanium", 1001)
-        assert cache.is_order_seen(35, 1001) is False
+    def test_is_order_seen_different_type_id(self, history):
+        history.add_order_seen(34, "Tritanium", 1001)
+        assert history.is_order_seen(35, 1001) is False
 
     def test_trim(self, monkeypatch):
         def _load_targets():
             return [{"type_id": 34}, {"type_id": 36}]
 
         monkeypatch.setattr("eve_monitor.market_monitor.load_targets", _load_targets)
-        cached_data = {
+        history_data = {
             MARKET_MONITOR: [
                 {
                     "type_id": 34,
@@ -116,17 +116,17 @@ class TestMarketCache:
                 },
             ]
         }
-        cache = MarketCache(cached_data)
-        cache.trim()
-        assert len(cache.items) == 1  # Only Tritanium should remain
-        assert 34 in cache.items
-        assert len(cache.items[34].orders_seen) == LAST_ORDER_TO_CACHE
-        assert all(v >= (10 * 10) for v in cache.items[34].orders_seen.values())
+        history = MarketHistory(history_data)
+        history.trim()
+        assert len(history.items) == 1  # Only Tritanium should remain
+        assert 34 in history.items
+        assert len(history.items[34].orders_seen) == LAST_ORDER_TO_CACHE
+        assert all(v >= (10 * 10) for v in history.items[34].orders_seen.values())
 
-    def test_to_json_serializable(self, cache):
-        cache.add_order_seen(34, "Tritanium", 1001)
-        cache.add_order_seen(36, "Pyerite", 2001)
-        data = cache.to_json_serializable()
+    def test_to_json_serializable(self, history):
+        history.add_order_seen(34, "Tritanium", 1001)
+        history.add_order_seen(36, "Pyerite", 2001)
+        data = history.to_json_serializable()
         assert isinstance(data, list)
         assert len(data) == 2
         type_ids = {item["type_id"] for item in data}

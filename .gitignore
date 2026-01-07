@@ -8,7 +8,7 @@ dist/
 *.spec
 
 appsettings.json
-cache.json
+history.json
 targets.json
 schema.yaml
 temp.*

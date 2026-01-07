@@ -2,7 +2,7 @@ import time
 from operator import itemgetter
 
 from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, REGIONS
-from .core import BaseCache, Core, get_module_name
+from .core import BaseHistory, Core, get_module_name
 
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
@@ -10,19 +10,19 @@ MIN_VALUE_THRESHOLD = 100_000_000
 LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
 
 
-class ContractCache(BaseCache):
-    def __init__(self, cache: dict = None):
+class ContractHistory(BaseHistory):
+    def __init__(self, history: dict = None):
         """
-        optionally takes a dict loaded from file cache, loaded the CONTRACT_SNIPER part if available
-        modify input cache to point to initialized object if given
+        optionally takes a dict loaded from history file, loaded the CONTRACT_SNIPER part if available
+        modify input history to point to initialized object if given
         """
         self.contracts: dict[int, dict[int, int]] = {}
-        if cache != None and CONTRACT_SNIPER in cache:
-            region_contracts = cache[CONTRACT_SNIPER]
+        if history != None and CONTRACT_SNIPER in history:
+            region_contracts = history[CONTRACT_SNIPER]
             for k, v in region_contracts.items():
                 self.contracts[int(k)] = {int(cid): t for cid, t in v.items()}
-        if cache != None:
-            cache[CONTRACT_SNIPER] = self
+        if history != None:
+            history[CONTRACT_SNIPER] = self
         return
 
     def trim(self):
@@ -52,8 +52,8 @@ class ContractCache(BaseCache):
 
 
 class ContractSniper(Core):
-    def __init__(self, cache: dict = None, *args, **kwargs):
-        self.cache = ContractCache(cache)
+    def __init__(self, history: dict = None, *args, **kwargs):
+        self.history = ContractHistory(history)
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
     def search_contract_in_region(self, region_id: int) -> list[dict]:
@@ -67,7 +67,7 @@ class ContractSniper(Core):
             if contract["type"] != "item_exchange":
                 self.log.debug(f"Ignoring non item exchange contract {contract_id}")
                 continue
-            if self.cache.is_contract_seen(region_id, contract_id):
+            if self.history.is_contract_seen(region_id, contract_id):
                 self.log.debug(f"Ignoring previously seen contract {contract_id}")
                 continue
             contracts.append(contract)
@@ -183,7 +183,7 @@ class ContractSniper(Core):
                 sold, requested = self.get_contract_items(contract_id)
                 if self.should_ignore_unseen_contract(sold):
                     self.log.debug(f"Ignoring buy or BPC only contract {contract_id}")
-                    self.cache.add_contract_seen(region_id, contract_id)
+                    self.history.add_contract_seen(region_id, contract_id)
                     continue
 
                 sold_price = self.get_appraisal_value(sold)
@@ -213,7 +213,7 @@ class ContractSniper(Core):
                     self.log.info(msg)
                     self.send_notification(msg)
 
-                self.cache.add_contract_seen(region_id, contract_id)
+                self.history.add_contract_seen(region_id, contract_id)
         return
 
     main = watch_contract

@@ -4,7 +4,7 @@ import time
 from operator import itemgetter
 
 from .constants import ESI_URL, TARGETS_JSON, REGIONS_JSON, REGIONS
-from .core import BaseCache, Core, get_module_name
+from .core import BaseHistory, Core, get_module_name
 
 MARKET_MONITOR = get_module_name(__name__)
 LAST_ORDER_TO_CACHE = 50
@@ -29,15 +29,15 @@ class ItemRecord:
         return
 
 
-class MarketCache(BaseCache):
-    def __init__(self, cache: dict = None):
+class MarketHistory(BaseHistory):
+    def __init__(self, history: dict = None):
         """
-        optionally takes a dict loaded from file cache, loaded the MARKET_MONITOR part if available
-        modify input cache to point to initialized object if given
+        optionally takes a dict loaded from history file, loaded the MARKET_MONITOR part if available
+        modify input history to point to initialized object if given
         """
         self.items: dict[int, ItemRecord] = {}
-        if cache != None and MARKET_MONITOR in cache:
-            items = cache[MARKET_MONITOR]
+        if history != None and MARKET_MONITOR in history:
+            items = history[MARKET_MONITOR]
             for item in items:
                 type_id, name, orders_seen = itemgetter(
                     "type_id", "name", "orders_seen"
@@ -45,8 +45,8 @@ class MarketCache(BaseCache):
                 self.items[type_id] = ItemRecord(
                     type_id, name, {int(oid): t for oid, t in orders_seen.items()}
                 )
-        if cache != None:
-            cache[MARKET_MONITOR] = self
+        if history != None:
+            history[MARKET_MONITOR] = self
         return
 
     def add_order_seen(self, type_id: int, name: str, order_id: int):
@@ -76,9 +76,9 @@ class MarketCache(BaseCache):
 
 
 class MarketMonitor(Core):
-    def __init__(self, cache: dict = None, *args, **kwargs):
+    def __init__(self, history: dict = None, *args, **kwargs):
         # only stores order_ids that has been sent to client
-        self.cache = MarketCache(cache)
+        self.history = MarketHistory(history)
         return super().__init__(MARKET_MONITOR, *args, **kwargs)
 
     def get_region_info(self):
@@ -160,14 +160,14 @@ class MarketMonitor(Core):
                             "volume_total",
                         )(order)
                     )
-                    if price <= threshold and not self.cache.is_order_seen(
+                    if price <= threshold and not self.history.is_order_seen(
                         type_id, order_id
                     ):
                         system = self.get_system_info(system_id)[0]
                         msg = f"{name} selling for {price:,.0f} isk in {system}, {region_name}, {volume_remain}/{volume_total}"
                         self.log.info(msg)
                         self.send_notification(msg)
-                        self.cache.add_order_seen(type_id, name, order_id)
+                        self.history.add_order_seen(type_id, name, order_id)
 
             if orders_seen == 0:
                 self.log.info(f"Done looking for {name}, no order found")
