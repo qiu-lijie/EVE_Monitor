@@ -15,6 +15,7 @@ from .constants import (
     TITLE,
     PUSHOVER_URL,
     APP_TOKEN,
+    USER_AGENT,
     USER_KEY,
     DESKTOP_NOTIFICATION,
     PUSHOVER_NOTIFICATION,
@@ -54,6 +55,7 @@ class Core(abc.ABC):
         self.name = name
         self.log = logging.getLogger(name)
         self.s = session if session else requests.Session()
+        self.s.headers.update({"User-Agent": USER_AGENT})
         self.threaded = threaded
         if not threaded:
             self.cur = sqlite3.connect(DB_PATH).cursor()
