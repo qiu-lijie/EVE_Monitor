@@ -67,4 +67,5 @@ for feature in features:
 if features == []:
     logging.error("Improperly configured, enable some features in settings")
 while True:
-    time.sleep(1000)
+    time.sleep(60 * 60)
+    dump_history(history_file)
