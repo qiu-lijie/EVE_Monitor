@@ -170,14 +170,25 @@ class ContractSniper(Core):
             self.log.debug(msg) if len(contracts) == 0 else self.log.info(msg)
 
             for contract in contracts:
-                contract_id, issuer_id, price, title, volume, station_id = itemgetter(
+                (
+                    contract_id,
+                    issuer_id,
+                    price,
+                    title,
+                    volume,
+                    station_id,
+                    date_issued,
+                ) = itemgetter(
                     "contract_id",
                     "issuer_id",
                     "price",
                     "title",
                     "volume",
                     "start_location_id",
-                )(contract)
+                    "date_issued",
+                )(
+                    contract
+                )
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
                 sold, requested = self.get_contract_items(contract_id)
@@ -194,6 +205,7 @@ class ContractSniper(Core):
                 msg = (
                     (f'Contract "{title}"' if title else "Item exchange contract")
                     + f" ({contract_id}) priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
+                    + f"\n\tlisted at {date_issued}"
                     + f"\n\tlocated in {station_name}, {system_name} (sec {security:.2}), {region_name}"
                     + f"\n\tselling {sold_price:,} isk\n{sold}"
                     + (
