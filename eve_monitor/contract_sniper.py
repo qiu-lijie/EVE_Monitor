@@ -207,9 +207,9 @@ class ContractSniper(Core):
                     + f" ({contract_id}) priced at {price:,.0f} isk, valued at {value:,.0f} isk, with {volume:,.0f} m3 volume"
                     + f"\n\tlisted at {date_issued}"
                     + f"\n\tlocated in {station_name}, {system_name} (sec {security:.2}), {region_name}"
-                    + f"\n\tselling {sold_price:,} isk\n{sold}"
+                    + f"\n\tselling {sold_price:,.0f} isk\n{sold}"
                     + (
-                        f"\n\trequesting {requested_price:,} isk\n{requested}"
+                        f"\n\trequesting {requested_price:,.0f} isk\n{requested}"
                         if requested
                         else ""
                     )
