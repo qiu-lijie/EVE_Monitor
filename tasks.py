@@ -33,12 +33,14 @@ def dump_history(history: dict[str, list[str]]):
     for k in history:
         if issubclass(type(history[k]), BaseHistory):
             history[k].trim()
+    temp_history = HISTORY_JSON + ".tmp"
     json.dump(
         history,
-        open(HISTORY_JSON, "w+", encoding="utf-8", newline="\n"),
+        open(temp_history, "w+", encoding="utf-8", newline="\n"),
         indent=4 if DEBUG else None,
         default=lambda c: c.to_json_serializable(),
     )
+    os.replace(temp_history, HISTORY_JSON)
     return
 
 
