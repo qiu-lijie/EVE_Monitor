@@ -1,3 +1,4 @@
+import dataclasses
 import time
 from operator import itemgetter
 
@@ -8,6 +9,19 @@ CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
 MIN_VALUE_THRESHOLD = 100_000_000
 LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
+
+
+@dataclasses.dataclass
+class InventoryType:
+    type_id: int
+    type_name: str = None
+    group_id: int = None
+    group_name: str = None
+    category_id: int = None
+    category_name: str = None
+
+    def __hash__(self) -> int:
+        return self.type_id
 
 
 class ContractHistory(BaseHistory):
@@ -73,6 +87,14 @@ class ContractSniper(Core):
             contracts.append(contract)
         return contracts
 
+    def sort_item_dict(
+        self, items: dict[InventoryType, int]
+    ) -> dict[InventoryType, int]:
+        """returns item dict with ships moved to the front"""
+        return dict(
+            sorted(items.items(), key=lambda item: item[0].category_name != "Ship")
+        )
+
     def get_contract_items(self, contract_id: int) -> tuple[str, str]:
         """returns a tuple of (items sold, items requested), ignoring blue print copy"""
         items = self.page_aware_get(
@@ -84,7 +106,7 @@ class ContractSniper(Core):
         if items == []:
             return ("", "")
 
-        sold, requested = "", ""
+        sold, requested = {}, {}
         for item in items:
             if item.get("is_blueprint_copy", False):
                 continue
@@ -94,7 +116,11 @@ class ContractSniper(Core):
             )(item)
             self.cur.execute(
                 """
-                select typeName from invTypes where typeID = ?
+                select it.typeID, it.typeName, ig.groupID, ig.groupName, ic.categoryID, ic.categoryName
+                from invTypes it 
+                    inner join invGroups ig on it.groupID = ig.groupID
+                    inner join invCategories ic on ig.categoryID = ic.categoryID
+                where it.typeID = ?
                 """,
                 (type_id,),
             )
@@ -104,13 +130,23 @@ class ContractSniper(Core):
                     f"typeID {type_id} not found, please update local database"
                 )
                 continue
-
-            type_name = res[0]
+            inv_type = InventoryType(*res)
             if is_included:
-                sold += f"{type_name}\t{quantity}\n"
+                sold[inv_type] = sold.get(inv_type, 0) + quantity
             else:
-                requested += f"{type_name}\t{quantity}\n"
-        return (sold, requested)
+                requested[inv_type] = requested.get(inv_type, 0) + quantity
+
+        sold = self.sort_item_dict(sold)
+        return (
+            "\n".join(
+                f"{inv_type.type_name}\t{quantity}"
+                for inv_type, quantity in sold.items()
+            ),
+            "\n".join(
+                f"{inv_type.type_name}\t{quantity}"
+                for inv_type, quantity in requested.items()
+            ),
+        )
 
     def get_appraisal_value(self, items: str, buy: bool = False) -> float:
         """returns appraisal value from third party website"""
@@ -151,7 +187,7 @@ class ContractSniper(Core):
         self.character_name_cache[character_id] = name
         return name
 
-    def should_ignore_unseen_contract(self, sold: str) -> bool:
+    def should_ignore_contract(self, sold: str) -> bool:
         """ignores contracts returned no parsed sold item, or only one single PLEX item"""
         return sold == "" or (
             sold[: sold.find("\t")] == "PLEX" and sold[sold.find("\n") :] == "\n"
@@ -192,7 +228,7 @@ class ContractSniper(Core):
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
                 sold, requested = self.get_contract_items(contract_id)
-                if self.should_ignore_unseen_contract(sold):
+                if self.should_ignore_contract(sold):
                     self.log.debug(f"Ignoring buy or BPC only contract {contract_id}")
                     self.history.add_contract_seen(region_id, contract_id)
                     continue
