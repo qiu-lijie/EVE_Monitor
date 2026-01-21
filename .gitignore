@@ -8,6 +8,7 @@ logs/
 
 *.xlsx
 *.spec
+*.db
 
 appsettings.json
 history.json

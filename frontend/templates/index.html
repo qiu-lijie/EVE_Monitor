@@ -8,10 +8,41 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
     <link rel="manifest" href="/static/favicon/site.webmanifest">
     <title>EVE Monitor</title>
+
+    <style>
+        body {
+            font: 16px monospace;
+            color: white;
+            background-color: black;
+        }
+
+        ul,
+        li {
+            list-style-type: none;
+            list-style-position: inside;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+        integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+        crossorigin="anonymous"></script>
 </head>
 
 <body>
-    hello world world
+    <ul id="logs"></ul>
+    <script>
+        const socket = io();
+        const logs = document.getElementById('logs');
+
+        socket.on('update', (msg) => {
+            const log = document.createElement('li');
+            log.textContent = msg;
+            logs.appendChild(log);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+    </script>
 </body>
 
 </html>

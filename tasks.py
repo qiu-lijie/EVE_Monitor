@@ -28,7 +28,7 @@ features = []
 threads = []
 
 
-def dump_history(history: dict[str, list[str]]):
+def dump_history(history: dict[str, BaseHistory]):
     """cleanup then dump history to file system"""
     for k in history:
         if issubclass(type(history[k]), BaseHistory):
