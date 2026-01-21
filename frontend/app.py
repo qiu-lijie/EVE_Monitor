@@ -22,17 +22,19 @@ def handle_message():
 
 
 def update():
-    """TODO"""
+    """broadcast log updates to connected clients"""
     f = subprocess.Popen(
-        ["tail", "-F", "logs/tasks.log"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ["tail", "-F", "logs/temp.log"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     p = select.poll()
     p.register(f.stdout)
     while True:
         if p.poll(1):
             line = str(f.stdout.readline(), "utf-8")
-            print(line)
-            socketio.emit("update", line)
+            if line != "":
+                socketio.emit("update", line)
     return
 
 
