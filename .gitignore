@@ -1,8 +1,10 @@
 __pycache__/
 .pytest_cache/
+.venv/
 .vscode/
 build/
 dist/
+logs/
 
 *.xlsx
 *.spec
