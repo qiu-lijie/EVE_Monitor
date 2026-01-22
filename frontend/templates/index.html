@@ -40,6 +40,9 @@
             const log = document.createElement('li');
             log.textContent = msg;
             logs.appendChild(log);
+            while (logs.children.length > 1000) {
+                logs.removeChild(logs.firstChild);
+            }
             window.scrollTo(0, document.body.scrollHeight);
         });
     </script>
