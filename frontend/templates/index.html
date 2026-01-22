@@ -35,15 +35,23 @@
     <script>
         const socket = io();
         const logs = document.getElementById('logs');
+        const KEEP_LAST_LINES = 1000;
 
-        socket.on('update', (msg) => {
-            const log = document.createElement('li');
-            log.textContent = msg;
-            logs.appendChild(log);
-            while (logs.children.length > 1000) {
-                logs.removeChild(logs.firstChild);
+        socket.on('update', (msg, refresh) => {
+            if (refresh)
+                logs.innerHTML = '';
+
+            lines = msg.split('\n');
+            for (const line of lines) {
+                const log = document.createElement('li');
+                log.innerHTML = line;
+                logs.appendChild(log);
             }
-            window.scrollTo(0, document.body.scrollHeight);
+            while (logs.children.length > KEEP_LAST_LINES)
+                logs.removeChild(logs.firstChild);
+
+            if (refresh)
+                window.scrollTo(0, document.body.scrollHeight);
         });
     </script>
 </body>
