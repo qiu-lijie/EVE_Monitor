@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<ul id="logs">
+    {% for log in logs %}
+    {% if log == '\n' %}
+    <br />
+    {% else %}
+    <pre>{{ log }}</pre>
+    {% endif %}
+    {% endfor %}
+</ul>
+
+<script>
+    window.scrollTo(0, document.body.scrollHeight);
+</script>
+{% endblock %}

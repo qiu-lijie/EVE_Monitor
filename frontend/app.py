@@ -2,7 +2,7 @@ import logging
 import select
 import subprocess
 import threading
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
 from eve_monitor.constants import MAIN_LOG_FILE, ERROR_LOG_FILE, NOTIFICATION_LOG_FILE
@@ -19,6 +19,18 @@ logger = logging.getLogger(__name__)
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/notifications")
+@app.route("/errors")
+def static_logs():
+    log_file_mapping = {
+        "/notifications": NOTIFICATION_LOG_FILE,
+        "/errors": ERROR_LOG_FILE,
+    }
+    lines = tail(log_file_mapping[request.path], SEND_LAST_LINES)
+    lines = [str(line, "utf-8") for line in lines]
+    return render_template("static_logs.html", logs=lines)
 
 
 @socketio.on("connect")

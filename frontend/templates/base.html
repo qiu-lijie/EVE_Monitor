@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/static/favicon/site.webmanifest">
+    <title>EVE Monitor</title>
+
+    <style>
+        body {
+            font: 16px monospace;
+            color: white;
+            background-color: black;
+            padding-top: 60px;
+        }
+
+        ul,
+        li,
+        pre {
+            list-style-type: none;
+            list-style-position: inside;
+            margin: 0;
+            padding: 0;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 10px 20px;
+            border-bottom: 1px solid #333;
+            z-index: 1000;
+        }
+
+        nav ul {
+            display: flex;
+            gap: 20px;
+        }
+
+        a {
+            color: unset;
+        }
+
+        a.internal {
+            text-decoration: none;
+        }
+
+        .selected {
+            color: black;
+            background-color: white;
+        }
+    </style>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+        integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+        crossorigin="anonymous"></script>
+</head>
+
+<nav>
+    <ul>
+        <li><a class="internal{% if request.path == '/' %} selected{% endif %}" href="/">Main</a></li>
+        <li><a class="internal{% if request.path == '/notifications' %} selected{% endif %}"
+                href="/notifications">Notifications</a></li>
+        <li><a class="internal{% if request.path == '/errors' %} selected{% endif %}" href="/errors">Errors</a></li>
+    </ul>
+    <ul>
+        <li><a target="_blank" href="https://janice.e-351.com/">Janice</a></li>
+        <li><a target="_blank"
+                href="https://developers.eveonline.com/api-explorer#/operations/GetContractsPublicItemsContractId">
+                API Explorer</a></li>
+        <li><a target="_blank" href="https://red-frog.org/black_calculator/">Black Frog</a></li>
+        <li><a target="_blank" href="https://www.pushx.net/">PushX</a></li>
+    </ul>
+</nav>
+
+<body>
+    {% block content %}{% endblock %}
+</body>
+
+</html>
