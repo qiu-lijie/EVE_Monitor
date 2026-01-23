@@ -92,6 +92,7 @@ def handle_interrupt(_, __):
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_interrupt)
+    signal.signal(signal.SIGTERM, handle_interrupt)
     multiprocessing.Process(target=main).start()
     threading.Thread(target=update).start()
     socketio.run(app)

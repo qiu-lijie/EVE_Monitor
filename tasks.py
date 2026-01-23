@@ -104,6 +104,7 @@ def handle_interrupt(_, __):
 
 def main():
     signal.signal(signal.SIGINT, handle_interrupt)
+    signal.signal(signal.SIGTERM, handle_interrupt)
     config_logging()
 
     if FEATURES[MARKET_MONITOR]:
