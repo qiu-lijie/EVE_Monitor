@@ -14,18 +14,18 @@ LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
 @dataclasses.dataclass
 class InventoryType:
     type_id: int
-    type_name: str = None
-    group_id: int = None
-    group_name: str = None
-    category_id: int = None
-    category_name: str = None
+    type_name: str = ""
+    group_id: int = 0
+    group_name: str = ""
+    category_id: int = 0
+    category_name: str = ""
 
     def __hash__(self) -> int:
         return self.type_id
 
 
 class ContractHistory(BaseHistory):
-    def __init__(self, history: dict = None):
+    def __init__(self, history: dict | None = None):
         """
         optionally takes a dict loaded from history file, loaded the CONTRACT_SNIPER part if available
         modify input history to point to initialized object if given
@@ -66,7 +66,7 @@ class ContractHistory(BaseHistory):
 
 
 class ContractSniper(Core):
-    def __init__(self, history: dict = None, *args, **kwargs):
+    def __init__(self, history: dict | None = None, *args, **kwargs):
         self.history = ContractHistory(history)
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
 
@@ -101,7 +101,7 @@ class ContractSniper(Core):
             ESI_URL + f"/contracts/public/items/{contract_id}",
             # since contracts routes are cached for longer, sometimes we are querying already completed contracts
             # ESI either returns 204, or 200 with empty content
-            expected_status_codes=(200, 204),
+            expected_status_codes={200, 204},
         )
         if items == []:
             return ("", "")

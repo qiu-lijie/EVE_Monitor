@@ -30,7 +30,7 @@ class ItemRecord:
 
 
 class MarketHistory(BaseHistory):
-    def __init__(self, history: dict = None):
+    def __init__(self, history: dict | None = None):
         """
         optionally takes a dict loaded from history file, loaded the MARKET_MONITOR part if available
         modify input history to point to initialized object if given
@@ -76,7 +76,7 @@ class MarketHistory(BaseHistory):
 
 
 class MarketMonitor(Core):
-    def __init__(self, history: dict = None, *args, **kwargs):
+    def __init__(self, history: dict | None = None, *args, **kwargs):
         # only stores order_ids that has been sent to client
         self.history = MarketHistory(history)
         return super().__init__(MARKET_MONITOR, *args, **kwargs)

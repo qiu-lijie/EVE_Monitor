@@ -49,8 +49,8 @@ class Core(abc.ABC):
     def __init__(
         self,
         name: str,
-        session: requests.Session = None,
-        threaded: threading.Event = False,
+        session: requests.Session | None = None,
+        threaded: threading.Event | None = None,
     ):
         self.name = name
         self.log = logging.getLogger(name)
@@ -70,6 +70,9 @@ class Core(abc.ABC):
         return
 
     def run(self, poll_rate: int):
+        if not self.threaded:
+            raise Exception("run can only be called in threaded mode")
+
         # creates the cursor as SQLite objects created in a thread can only be used in that same thread
         self.cur = sqlite3.connect(DB_PATH).cursor()
 
@@ -121,7 +124,7 @@ class Core(abc.ABC):
                         title=TITLE,
                         message=msg[:256],
                         app_name=TITLE,
-                    )
+                    )  # type: ignore
                 else:  # TODO add mac support
                     self.log.warning(
                         "No supported desktop notification implementation found"
@@ -149,19 +152,19 @@ class Core(abc.ABC):
     def get(
         self,
         url: str,
-        excepted_status_codes: int | tuple[int] = (200,),
+        expected_status_codes: int | set[int] = {200},
         *args,
         **kwargs,
     ) -> requests.Response:
         """logs a warning if unexpected status code is received, transparently handles ETag caching"""
-        if type(excepted_status_codes) == int:
-            excepted_status_codes = (excepted_status_codes,)
+        if isinstance(expected_status_codes, int):
+            expected_status_codes = {expected_status_codes}
         if url in self.get_etags:
             if "headers" not in kwargs:
                 kwargs["headers"] = {}
             kwargs["headers"]["If-None-Match"] = self.get_etags[url]
         res = self.s.get(url, *args, **kwargs)
-        if res.status_code not in excepted_status_codes:
+        if res.status_code not in expected_status_codes:
             self.log.warning(
                 f"Request failed at {res.url}, status code {res.status_code}\n\t{res.content}"
             )
@@ -172,23 +175,24 @@ class Core(abc.ABC):
     def page_aware_get(
         self,
         url: str,
-        last_n_page: int = float("inf"),
+        last_n_page: int | float = float("inf"),
         update_next_poll: bool = False,
         *args,
         **kwargs,
     ) -> list:
         """return a list of objects over potentially many pages, only keeping last n pages"""
-        expected_status_codes = (200, 304)
+        expected_status_codes = {200, 304}
         if "expected_status_codes" in kwargs:
-            expected_status_codes = (
+            expected_status_codes = {
                 *expected_status_codes,
                 *kwargs.pop("expected_status_codes"),
-            )
+            }
         res = self.get(url, expected_status_codes, *args, **kwargs)
 
         EXPIRES = "Expires"
         if update_next_poll and EXPIRES in res.headers:
-            expiry = timegm(parsedate(res.headers[EXPIRES]))
+            parsed_expiry = parsedate(res.headers[EXPIRES])
+            expiry = timegm(parsed_expiry) if parsed_expiry else float("inf")
             next_poll = min(self.next_poll, expiry)
             self.log.debug(
                 f"resource expiry {expiry}, next poll {self.next_poll} -> {next_poll}"
@@ -215,15 +219,15 @@ class Core(abc.ABC):
     def post(
         self,
         url: str,
-        excepted_status_codes: int | tuple[int] = (200,),
+        expected_status_codes: int | set[int] = {200},
         *args,
         **kwargs,
     ) -> requests.Response:
         """logs a warning if unexpected status code is received"""
-        if type(excepted_status_codes) == int:
-            excepted_status_codes = (excepted_status_codes,)
+        if isinstance(expected_status_codes, int):
+            expected_status_codes = {expected_status_codes}
         res = self.s.post(url, *args, **kwargs)
-        if res.status_code not in excepted_status_codes:
+        if res.status_code not in expected_status_codes:
             self.log.warning(
                 f"Request failed at {res.url}, status code {res.status_code}\n\t{res.content}"
             )
@@ -237,7 +241,7 @@ class Core(abc.ABC):
         )
         res = self.cur.fetchone()
         if res == None:
-            return ("player citadel", 0)
+            return ("player citadel", 0, 0.0)
         return res
 
     def get_system_info(self, system_id: int) -> tuple[str, float]:
