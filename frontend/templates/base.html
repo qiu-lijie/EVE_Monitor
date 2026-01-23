@@ -54,7 +54,7 @@
             text-decoration: none;
         }
 
-        .selected {
+        .active {
             color: black;
             background-color: white;
         }
@@ -67,10 +67,11 @@
 
 <nav>
     <ul>
-        <li><a class="internal{% if request.path == '/' %} selected{% endif %}" href="/">Main</a></li>
-        <li><a class="internal{% if request.path == '/notifications' %} selected{% endif %}"
+        <li><a class="internal{% if request.path == '/' %} active{% endif %}" href="/">Main</a></li>
+        <li><a class="internal{% if request.path == '/notifications' %} active{% endif %}"
                 href="/notifications">Notifications</a></li>
-        <li><a class="internal{% if request.path == '/errors' %} selected{% endif %}" href="/errors">Errors</a></li>
+        <li><a class="internal{% if request.path == '/errors' %} active{% endif %}" href="/errors">Errors</a></li>
+        <li id="status" style="margin-left: auto;">Disconnected</li>
     </ul>
     <ul>
         <li><a target="_blank" href="https://janice.e-351.com/">Janice</a></li>

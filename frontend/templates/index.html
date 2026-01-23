@@ -5,6 +5,9 @@
 <script>
     const socket = io();
     const logs = document.getElementById('logs');
+    const status = document.getElementById('status');
+    const connected = 'Connected';
+    const disconnected = 'Disconnected';
     const KEEP_LAST_LINES = 1000;
 
     socket.on('update', (msg, refresh) => {
@@ -22,6 +25,15 @@
 
         // if (refresh)
         window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('connect', () => {
+        status.innerHTML = connected;
+        status.classList.add('active');
+    });
+    socket.on('disconnect', () => {
+        status.innerHTML = disconnected
+        status.classList.remove('active');
     });
 </script>
 {% endblock %}
