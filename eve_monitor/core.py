@@ -21,26 +21,16 @@ from .constants import (
     DESKTOP_NOTIFICATION,
     PUSHOVER_NOTIFICATION,
     DEBUG,
-    MAX_LOG_SIZE,
-    BACKUP_COUNT,
-    NOTIFICATION_LOG_FILE,
+    NOTIFICATION_LOG,
 )
+
 
 INIT_BACKOFF = 60
 MAX_BACKOFF = 32 * 60
 MAX_ERROR_NOTIFICATIONS = 3
 ESI_PAGE_KEY = "X-Pages"
 
-notification_log_handler = logging.handlers.RotatingFileHandler(
-    NOTIFICATION_LOG_FILE,
-    mode="a+",
-    maxBytes=MAX_LOG_SIZE,
-    backupCount=BACKUP_COUNT,
-    encoding="utf-8",
-)
-notification_log = logging.getLogger("notification")
-notification_log.setLevel(logging.INFO)
-notification_log.addHandler(notification_log_handler)
+notification_log = logging.getLogger(NOTIFICATION_LOG)
 
 
 def get_module_name(name: str) -> str:

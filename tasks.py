@@ -11,18 +11,20 @@ from eve_monitor.constants import (
     SETTINGS,
     DEBUG,
     SETTINGS_DIR,
-    MAX_LOG_SIZE,
-    BACKUP_COUNT,
     LOG_TO_FILE,
     LOGS_DIR,
     MAIN_LOG_FILE,
     ERROR_LOG_FILE,
+    NOTIFICATION_LOG_FILE,
+    NOTIFICATION_LOG,
 )
 from eve_monitor.contract_sniper import CONTRACT_SNIPER, ContractSniper
 from eve_monitor.core import BaseHistory
 from eve_monitor.market_monitor import MARKET_MONITOR, MarketMonitor
 
 
+MAX_LOG_SIZE = 10 * 1024 * 1024  # 10 MB
+BACKUP_COUNT = 1
 FEATURES = SETTINGS["features_enabled"]
 POLL_RATE = SETTINGS["poll_rate_in_min"]
 HISTORY_JSON = SETTINGS_DIR + "history.json"
@@ -37,22 +39,20 @@ threads = []
 
 def config_logging():
     handlers = [logging.StreamHandler()]
+    file_handler_args = {
+        "mode": "a+",
+        "maxBytes": MAX_LOG_SIZE,
+        "backupCount": BACKUP_COUNT,
+        "encoding": "utf-8",
+    }
     if LOG_TO_FILE:
         if not os.path.exists(LOGS_DIR):
             os.makedirs(LOGS_DIR)
         main_log_handler = logging.handlers.RotatingFileHandler(
-            MAIN_LOG_FILE,
-            mode="a+",
-            maxBytes=MAX_LOG_SIZE,
-            backupCount=BACKUP_COUNT,
-            encoding="utf-8",
+            MAIN_LOG_FILE, **file_handler_args
         )
         error_log_handler = logging.handlers.RotatingFileHandler(
-            ERROR_LOG_FILE,
-            mode="a+",
-            maxBytes=MAX_LOG_SIZE,
-            backupCount=BACKUP_COUNT,
-            encoding="utf-8",
+            ERROR_LOG_FILE, **file_handler_args
         )
         error_log_handler.setLevel(logging.WARNING)
         handlers += [main_log_handler, error_log_handler]
@@ -63,6 +63,16 @@ def config_logging():
         handlers=handlers,
     )
     logging.getLogger("urllib3").setLevel(logging.INFO)
+
+    notification_log = logging.getLogger(NOTIFICATION_LOG)
+    notification_log.handlers.clear()
+    notification_log.propagate = False
+    if LOG_TO_FILE:
+        notification_log.addHandler(
+            logging.handlers.RotatingFileHandler(
+                NOTIFICATION_LOG_FILE, **file_handler_args
+            )
+        )
     return
 
 
