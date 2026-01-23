@@ -1,17 +1,23 @@
 import logging
+import multiprocessing
 import select
+import signal
 import subprocess
+import sys
 import threading
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
 from eve_monitor.constants import MAIN_LOG_FILE, ERROR_LOG_FILE, NOTIFICATION_LOG_FILE
+from tasks import main
 
 
 UPDATE = "update"
 SEND_LAST_LINES = 500
 
-app = Flask(__name__)
+app = Flask(
+    __name__, static_folder="frontend/static", template_folder="frontend/templates"
+)
 socketio = SocketIO(app)
 logger = logging.getLogger(__name__)
 
@@ -53,6 +59,9 @@ def tail(file: str, n: int) -> list[bytes]:
     return lines
 
 
+event = threading.Event()
+
+
 def update():
     """broadcast log updates to connected clients"""
     f = subprocess.Popen(
@@ -69,9 +78,20 @@ def update():
             line = str(f.stdout.readline(), "utf-8")
             if line != "":
                 socketio.emit(UPDATE, line)
+        if event.is_set():
+            break
+    return
+
+
+def handle_interrupt(_, __):
+    event.set()
+    logger.info("Interrupt received, exiting")
+    sys.exit(0)
     return
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handle_interrupt)
+    multiprocessing.Process(target=main).start()
     threading.Thread(target=update).start()
     socketio.run(app)
