@@ -5,8 +5,9 @@ import threading
 from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
 
+from eve_monitor.constants import MAIN_LOG_FILE, ERROR_LOG_FILE, NOTIFICATION_LOG_FILE
 
-LOG_FILE = "logs/tasks.log"
+
 UPDATE = "update"
 SEND_LAST_LINES = 500
 
@@ -23,7 +24,7 @@ def index():
 @socketio.on("connect")
 def handle_connect():
     logger.info("client connected")
-    lines = tail(LOG_FILE, SEND_LAST_LINES)
+    lines = tail(MAIN_LOG_FILE, SEND_LAST_LINES)
     res = "Connected\n"
     for line in lines:
         res += str(line, "utf-8")
@@ -43,7 +44,7 @@ def tail(file: str, n: int) -> list[bytes]:
 def update():
     """broadcast log updates to connected clients"""
     f = subprocess.Popen(
-        ["tail", "-Fn", "0", LOG_FILE],
+        ["tail", "-Fn", "0", MAIN_LOG_FILE],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

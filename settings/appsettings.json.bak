@@ -12,5 +12,6 @@
     "features_enabled": {
         "market_monitor": false,
         "contract_sniper": false
-    }
+    },
+    "LOG_TO_FILE": true // must enable to work with web UI
 }
