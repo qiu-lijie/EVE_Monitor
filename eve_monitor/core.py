@@ -174,6 +174,9 @@ class Core(abc.ABC):
             self.log.warning(
                 f"Request failed at {res.url}, status code {res.status_code}\n\t{res.content}"
             )
+        if res.status_code >= 500 and res.status_code < 600:
+            # handles eve cluster daily reset, returns 504 or 520 usually
+            raise requests.exceptions.ConnectionError("Server return 5xx error")
         if "ETag" in res.headers:
             self.get_etags[url] = res.headers["ETag"]
         return res

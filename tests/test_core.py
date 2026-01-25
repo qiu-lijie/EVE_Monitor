@@ -8,15 +8,19 @@ from eve_monitor.core import ESI_PAGE_KEY, Core
 URL = "http://example.com/api"
 
 
+class ConcreteCore(Core):
+    def main(self):
+        pass
+
+
 class TestCore:
     @pytest.fixture
     def session(self):
         return Mock()
 
     @pytest.fixture
-    def core(self, monkeypatch, session):
-        monkeypatch.setattr(Core, "__abstractmethods__", set())
-        return Core("test_core", session)
+    def core(self, session):
+        return ConcreteCore("test_core", session)
 
     def basic_response(self, n_pages, status_code=200, json_data=None):
         mock_response = Mock()
@@ -107,7 +111,7 @@ class TestCore:
     def test_page_aware_get_failed_page_request(self, core, session):
         """Test handles failed page requests gracefully"""
         mock_resp1 = self.basic_response(3, 200, [{"id": 1}])
-        mock_resp2 = self.basic_response(1, 500)
+        mock_resp2 = self.basic_response(1, 404)
         session.get.side_effect = [mock_resp1, mock_resp2, mock_resp1]
 
         result = core.page_aware_get(URL)
