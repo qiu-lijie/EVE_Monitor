@@ -8,6 +8,7 @@
     const status = document.getElementById('status');
     const html = document.documentElement;
     const connected = 'Connected';
+    const title_connected = " - Connected"
     const disconnected = 'Disconnected';
     const keep_last_lines = 1000;
 
@@ -32,10 +33,12 @@
     socket.on('connect', () => {
         status.innerHTML = connected;
         status.classList.add('active');
+        document.title += title_connected;
     });
     socket.on('disconnect', () => {
         status.innerHTML = disconnected
         status.classList.remove('active');
+        document.title = document.title.replace(title_connected, "")
     });
 </script>
 {% endblock %}
