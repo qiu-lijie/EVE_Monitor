@@ -8,7 +8,13 @@ import threading
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 
-from eve_monitor.constants import MAIN_LOG_FILE, ERROR_LOG_FILE, NOTIFICATION_LOG_FILE
+from eve_monitor.constants import (
+    MAIN_LOG_FILE,
+    ERROR_LOG_FILE,
+    NOTIFICATION_LOG_FILE,
+    DEBUG,
+    DECOUPLED_UI,
+)
 from tasks import main
 
 
@@ -93,6 +99,7 @@ def handle_interrupt(_, __):
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_interrupt)
     signal.signal(signal.SIGTERM, handle_interrupt)
-    multiprocessing.Process(target=main).start()
+    if not DECOUPLED_UI:
+        multiprocessing.Process(target=main).start()
     threading.Thread(target=update).start()
-    socketio.run(app)
+    socketio.run(app, debug=DEBUG)
