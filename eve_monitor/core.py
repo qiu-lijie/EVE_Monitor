@@ -1,6 +1,5 @@
 import abc
 import logging
-import logging.handlers
 import requests
 import sqlite3
 import sys

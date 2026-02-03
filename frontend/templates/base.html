@@ -46,7 +46,11 @@
 
         nav ul {
             display: flex;
-            gap: 20px;
+            gap: 10px;
+        }
+
+        nav li {
+            padding: 0 5px;
         }
 
         a {
@@ -70,11 +74,12 @@
 
 <nav>
     <ul>
-        <li><a class="internal{% if request.path == '/' %} active{% endif %}" href="/">Main</a></li>
-        <li><a class="internal{% if request.path == '/notifications' %} active{% endif %}"
+        <li class="{% if request.path == '/' %}active{% endif %}"><a class="internal" href="/">Main</a></li>
+        <li class="{% if request.path == '/notifications' %}active{% endif %}"><a class="internal"
                 href="/notifications">Notifications</a></li>
-        <li><a class="internal{% if request.path == '/errors' %} active{% endif %}" href="/errors">Errors</a></li>
-        <li id="status" style="margin-left: auto;">Disconnected</li>
+        <li class="{% if request.path == '/errors' %}active{% endif %}"><a class="internal" href="/errors">Errors</a>
+        </li>
+        <li id="status" style="margin-left: auto;"></li>
     </ul>
     <ul>
         <li><a target="_blank" href="https://janice.e-351.com/">Janice</a></li>
