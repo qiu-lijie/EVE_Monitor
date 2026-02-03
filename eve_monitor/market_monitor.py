@@ -129,6 +129,9 @@ class MarketMonitor(Core):
         # load each time to enable hot reload
         targets = load_targets()
         for target in targets:
+            if target.get("ignored", False):
+                continue
+
             orders_seen = 0
             tar_region_id = target.get("region", None)
             type_id, name, threshold = itemgetter("type_id", "name", "threshold")(

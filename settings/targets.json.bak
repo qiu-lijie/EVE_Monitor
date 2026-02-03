@@ -4,7 +4,8 @@
             "type_id": 0,
             "region": 0,    # accepts a specific region to look for the item, or 19000001 for plex region
             "name": "",
-            "threshold": 0
+            "threshold": 0,
+            "ignored": false
         }
     ],
     "market_salvager": [
