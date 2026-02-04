@@ -8,6 +8,9 @@
             "ignored": false
         }
     ],
+    "contract_sniper": [
+        # list of type ids to look for in contracts
+    ],
     "market_salvager": [
         {
             "type_id": 0,

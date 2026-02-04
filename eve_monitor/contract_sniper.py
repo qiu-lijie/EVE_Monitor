@@ -1,14 +1,20 @@
 import dataclasses
+import json
 import time
 from operator import itemgetter
 
-from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, REGIONS
+from .constants import APPRAISAL_URL, APPRAISAL_API_KEY, ESI_URL, REGIONS, TARGETS_JSON
 from .core import BaseHistory, Core, get_module_name
 
 CONTRACT_SNIPER = get_module_name(__name__)
 ARBITRAGE_THRESHOLD = 0.5
+SPECIAL_THRESHOLD = 0.8
 MIN_VALUE_THRESHOLD = 100_000_000
 LAST_CONTRACTS_TO_CACHE = 2000  # 1000 per page, last 2 pages
+
+
+def load_targets() -> list[int]:
+    return json.load(open(TARGETS_JSON))[CONTRACT_SNIPER]
 
 
 @dataclasses.dataclass
@@ -66,6 +72,8 @@ class ContractHistory(BaseHistory):
 
 
 class ContractSniper(Core):
+    targets: list[int] = []
+
     def __init__(self, history: dict | None = None, *args, **kwargs):
         self.history = ContractHistory(history)
         return super().__init__(CONTRACT_SNIPER, *args, **kwargs)
@@ -95,7 +103,7 @@ class ContractSniper(Core):
             sorted(items.items(), key=lambda item: item[0].category_name != "Ship")
         )
 
-    def get_contract_items(self, contract_id: int) -> tuple[str, str]:
+    def get_contract_items(self, contract_id: int) -> tuple[str, str, bool]:
         """returns a tuple of (items sold, items requested), ignoring blue print copy"""
         items = self.page_aware_get(
             ESI_URL + f"/contracts/public/items/{contract_id}",
@@ -104,16 +112,23 @@ class ContractSniper(Core):
             expected_status_codes={200, 204},
         )
         if items == []:
-            return ("", "")
+            return ("", "", False)
 
         sold, requested = {}, {}
+        has_item_of_interest = False
         for item in items:
-            if item.get("is_blueprint_copy", False):
-                continue
-
             is_included, quantity, type_id = itemgetter(
                 "is_included", "quantity", "type_id"
             )(item)
+
+            if type_id in self.targets:
+                has_item_of_interest = True
+                self.log.info(
+                    f"Found item of interest {type_id} in contract {contract_id}"
+                )
+            if item.get("is_blueprint_copy", False):
+                continue
+
             self.cur.execute(
                 """
                 select it.typeID, it.typeName, ig.groupID, ig.groupName, ic.categoryID, ic.categoryName
@@ -146,6 +161,7 @@ class ContractSniper(Core):
                 f"{inv_type.type_name}\t{quantity}"
                 for inv_type, quantity in requested.items()
             ),
+            has_item_of_interest,
         )
 
     def get_appraisal_value(self, items: str, buy: bool = False) -> float:
@@ -195,6 +211,7 @@ class ContractSniper(Core):
 
     def watch_contract(self):
         """watch for low priced low volume contract"""
+        self.targets = load_targets()
         for region in REGIONS:
             region_name, region_id, known_space = itemgetter(
                 "name", "region_id", "known_space"
@@ -227,7 +244,9 @@ class ContractSniper(Core):
                 )
                 self.log.debug(f"Processing contract {contract_id} {title}")
 
-                sold, requested = self.get_contract_items(contract_id)
+                sold, requested, has_item_of_interest = self.get_contract_items(
+                    contract_id
+                )
                 if self.should_ignore_contract(sold):
                     self.log.debug(f"Ignoring buy or BPC only contract {contract_id}")
                     self.history.add_contract_seen(region_id, contract_id)
@@ -255,9 +274,14 @@ class ContractSniper(Core):
                 if (
                     sold_price * ARBITRAGE_THRESHOLD >= (price + requested_price)
                     and value >= MIN_VALUE_THRESHOLD
+                ) or (
+                    has_item_of_interest
+                    and sold_price * SPECIAL_THRESHOLD >= (price + requested_price)
                 ):
                     issuer = self.get_character_name(issuer_id)
                     msg = f"{issuer}'s " + msg
+                    if has_item_of_interest:
+                        msg = "The following contract has item(s) of interest\n\t" + msg
                     self.log.info(msg)
                     self.send_notification(msg)
 
